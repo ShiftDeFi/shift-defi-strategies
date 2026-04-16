@@ -19,3 +19,5 @@ docs/
 node_modules/
 package-lock.json
 foundry.lock
+
+lcov.info

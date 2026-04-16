@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -10,7 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {StrategyTemplate} from "@shift-defi/core/StrategyTemplate.sol";
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
 import {IStrategyContainer} from "@shift-defi/core/interfaces/IStrategyContainer.sol";
-import {Errors} from "@shift-defi/core/libraries/helpers/Errors.sol";
+import {Errors} from "@shift-defi/core/libraries/Errors.sol";
 
 import {IFluidSupply} from "../interfaces/IFluidSupply.sol";
 import {IFluidLendingResolver} from "../dependencies/fluid/IFluidLendingResolver.sol";
@@ -132,7 +131,7 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
             vars.assetsBalance = IERC20(vars.assetCached).balanceOf(address(this));
             _swapToInputTokens(vars.rewardToken, vars.assetCached, 0, false);
             vars.rewardInAsset = IERC20(vars.assetCached).balanceOf(address(this)) - vars.assetsBalance;
-            vars.treasuryFee = vars.rewardInAsset.mulDiv(IStrategyContainer(vars.strategyContainer).feePct(), BPS);
+            vars.treasuryFee = vars.rewardInAsset.mulDiv(IStrategyContainer(vars.strategyContainer).feePct(), MAX_BPS);
             if (vars.treasuryFee > 0)
                 IERC20(vars.assetCached).safeTransfer(
                     IStrategyContainer(vars.strategyContainer).treasury(),
@@ -187,10 +186,10 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
 
     function _exitFluid(uint256 share) internal {
         require(share > 0, Errors.ZeroAmount());
-        require(share <= BPS, Errors.IncorrectAmount());
+        require(share <= MAX_BPS, Errors.IncorrectAmount());
 
         address fTokenCached = fToken;
-        uint256 liquidity = IERC20(fTokenCached).balanceOf(address(this)).mulDiv(share, BPS);
+        uint256 liquidity = IERC20(fTokenCached).balanceOf(address(this)).mulDiv(share, MAX_BPS);
         if (liquidity > 0) {
             IERC20(fTokenCached).safeIncreaseAllowance(fTokenCached, liquidity);
             IFluidToken(fTokenCached).redeem(liquidity, address(this), address(this));
@@ -210,8 +209,8 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
         if (vars.incomeInAsset == 0) return;
 
         vars.balanceBefore = IERC20(vars.asset).balanceOf(address(this));
-        vars.treasuryFee = vars.incomeInAsset.mulDiv(_feePct, BPS);
-        vars.shares = vars.treasuryFee.mulDiv(BPS, vars.fTokensInAsset);
+        vars.treasuryFee = vars.incomeInAsset.mulDiv(_feePct, MAX_BPS);
+        vars.shares = vars.treasuryFee.mulDiv(MAX_BPS, vars.fTokensInAsset);
         if (vars.shares > 0) _exitFluid(vars.shares);
         vars.balanceAfter = IERC20(vars.asset).balanceOf(address(this));
 

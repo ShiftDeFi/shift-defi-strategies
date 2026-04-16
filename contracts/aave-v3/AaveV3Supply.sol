@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {StrategyTemplate} from "@shift-defi/core/StrategyTemplate.sol";
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
-import {Errors} from "@shift-defi/core/libraries/helpers/Errors.sol";
+import {Errors} from "@shift-defi/core/libraries/Errors.sol";
 
 import {IPool} from "../dependencies/aave-v3/IPool.sol";
 
@@ -131,7 +131,7 @@ contract AaveV3Supply is StrategyTemplate {
         uint256 allocatedAmount = IERC20(reserveAToken).balanceOf(address(this));
         require(allocatedAmount > 0, NoReserveAllocation());
 
-        uint256 amountToWithdraw = allocatedAmount.mulDiv(share, BPS);
+        uint256 amountToWithdraw = allocatedAmount.mulDiv(share, MAX_BPS);
         _exitAaveReserveSuppliedFlat(amountToWithdraw);
     }
 
@@ -148,7 +148,7 @@ contract AaveV3Supply is StrategyTemplate {
         uint256 lastReserveATokenBalanceCached = lastReserveATokenBalance;
         if (currentReserveATokenBalance > lastReserveATokenBalanceCached) {
             uint256 income = currentReserveATokenBalance - lastReserveATokenBalanceCached;
-            uint256 fee = income.mulDiv(feePct, BPS);
+            uint256 fee = income.mulDiv(feePct, MAX_BPS);
             uint256 withdrawnAmount = _exitAaveReserveSuppliedFlat(fee);
             IERC20(reserveAsset).safeTransfer(treasury, withdrawnAmount);
         }
