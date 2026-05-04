@@ -12,11 +12,10 @@ import {IStrategyContainer} from "@shift-defi/core/interfaces/IStrategyContainer
 import {Errors} from "@shift-defi/core/libraries/Errors.sol";
 
 import {IFluidSupply} from "../interfaces/IFluidSupply.sol";
-import {IFluidLendingResolver} from "../dependencies/fluid/IFluidLendingResolver.sol";
 import {IFluidMerkleDistributor} from "../dependencies/fluid/IFluidMerkleDistributor.sol";
 import {IFluidToken} from "../dependencies/fluid/IFluidToken.sol";
 
-contract FluidSupply is IFluidSupply, StrategyTemplate {
+contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -24,16 +23,30 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
     bytes32 private constant FLUID_SUPPLY_STATE_ID = keccak256("FLUID_SUPPLY_STATE_ID");
 
     /// @notice State ID for the token only state (holding the asset directly)
-    bytes32 private constant TOKEN_ONLY_STATE_ID = keccak256("TOKEN_ONLY_STATE_ID");
+    bytes32 private constant UNDERLYING_ASSET_STATE_ID = keccak256("UNDERLYING_ASSET_STATE_ID");
+
+    /// @notice Role for the Merkle claimer
+    bytes32 private constant MERKLE_CLAIMER_ROLE = keccak256("MERKLE_CLAIMER_ROLE");
 
     /// @notice The Fluid fToken address
     address public fToken;
 
     /// @notice The underlying asset address
-    address public asset;
+    address public underlyingAsset;
 
     /// @notice The last recorded deposit balance in asset terms, used for harvest calculations
-    uint256 public lastDepositBalance;
+    uint256 public lastFTokenBalance;
+
+    /// @notice The address of the Fluid Merkle distributor contract
+    address public merkleDistributor;
+
+    /// @notice The address of the Merkle reward token
+    address public merkleRewardToken;
+    struct SlippageParams {
+        uint256 enterMaxSlippage;
+        uint256 exitMaxSlippage;
+        uint256 emergencyExitMaxSlippage;
+    }
 
     constructor() {
         _disableInitializers();
@@ -41,28 +54,51 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
 
     /// @notice Initializes the FluidSupply strategy contract
     /// @dev Sets up the Fluid fToken and asset addresses, and configures the strategy states
-    /// @param _agent The address of the strategy container contract
-    /// @param _asset The address of the underlying asset
-    /// @param _resolver The address of the Fluid lending resolver contract
-    function initialize(address _agent, address _asset, address _resolver) external initializer {
-        require(_agent != address(0), Errors.ZeroAddress());
-        require(_asset != address(0), Errors.ZeroAddress());
-        require(_resolver != address(0), Errors.ZeroAddress());
+    /// @param strategyContainer The address of the strategy container contract
+    /// @param defaultAdmin The address of the default admin
+    /// @param merkleClaimer The address of the Merkle claimer
+    /// @param _fToken The address of the strategy's fToken
+    /// @param _merkleDistributor The address of the Merkle distributor
+    function initialize(
+        address strategyContainer,
+        address defaultAdmin,
+        address merkleClaimer,
+        address _fToken,
+        address _merkleDistributor,
+        SlippageParams memory slippageParams
+    ) external initializer {
+        __StrategyTemplate_init(
+            strategyContainer,
+            slippageParams.enterMaxSlippage,
+            slippageParams.exitMaxSlippage,
+            slippageParams.emergencyExitMaxSlippage
+        );
+        __AccessControl_init();
 
-        __StrategyTemplate_init(_agent);
+        require(defaultAdmin != address(0), Errors.ZeroAddress());
+        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+        require(merkleClaimer != address(0), Errors.ZeroAddress());
+        _grantRole(MERKLE_CLAIMER_ROLE, merkleClaimer);
+
+        require(_fToken != address(0), Errors.ZeroAddress());
+        fToken = _fToken;
+        underlyingAsset = IFluidToken(_fToken).asset();
+
+        require(_merkleDistributor != address(0), Errors.ZeroAddress());
+        merkleDistributor = _merkleDistributor;
+
+        merkleRewardToken = IFluidMerkleDistributor(_merkleDistributor).TOKEN();
+
+        _setState(UNDERLYING_ASSET_STATE_ID, false, false, true, 0);
         _setState(FLUID_SUPPLY_STATE_ID, true, true, false, 1);
-        _setState(TOKEN_ONLY_STATE_ID, false, false, true, 0);
-
-        asset = _asset;
-        fToken = IFluidLendingResolver(_resolver).computeFToken(_asset, "fToken");
     }
 
     /// @inheritdoc IStrategyTemplate
     function stateNav(bytes32 stateId) public view override returns (uint256) {
         if (stateId == FLUID_SUPPLY_STATE_ID) {
             return fluidNav();
-        } else if (stateId == TOKEN_ONLY_STATE_ID) {
-            return assetNav();
+        } else if (stateId == UNDERLYING_ASSET_STATE_ID) {
+            return underlyingAssetNav();
         } else if (stateId == NO_ALLOCATION_STATE_ID) {
             return 0;
         } else {
@@ -71,78 +107,68 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
     }
 
     /// @notice Calculates the NAV for the Fluid supply state
-    /// @dev Returns the value of fTokens held by the contract in notion, using previewRedeem to get the underlying asset value
+    /// @dev Returns the value of fTokens held by the contract in notion
     /// @return The NAV of fTokens in notion
     function fluidNav() public view returns (uint256) {
         address fTokenCached = fToken;
-        uint256 fBalance = IERC20(fTokenCached).balanceOf(address(this));
-        uint256 navInNotion = IFluidToken(fTokenCached).previewRedeem(fBalance);
-        return getTokenAmountInNotion(asset, navInNotion);
+        uint256 fTokenBalance = IERC20(fTokenCached).balanceOf(address(this));
+        return getTokenAmountInNotion(underlyingAsset, IFluidToken(fTokenCached).convertToAssets(fTokenBalance));
     }
 
     /// @notice Calculates the NAV for the asset state
     /// @dev Returns the value of assets held by the contract in notion
     /// @return The NAV of assets in notion
-    function assetNav() public view returns (uint256) {
-        address assetCached = asset;
-        return getTokenAmountInNotion(assetCached, IERC20(assetCached).balanceOf(address(this)));
+    function underlyingAssetNav() public view returns (uint256) {
+        address underlyingAssetCached = underlyingAsset;
+        return getTokenAmountInNotion(underlyingAssetCached, IERC20(underlyingAssetCached).balanceOf(address(this)));
     }
 
-    /// @notice Claims rewards from Fluid Merkle distributor and reinvests them
-    /// @dev Claims rewards using merkle proof, swaps to asset, takes treasury fee, and reinvests remaining amount
-    /// @param distributor The address of the Fluid Merkle distributor contract
-    /// @param cumulativeAmount The cumulative reward amount to claim
-    /// @param positionType The position type identifier
-    /// @param positionId The position ID
-    /// @param cycle The reward cycle number
-    /// @param merkleProof The merkle proof for the claim
-    /// @param metadata Additional metadata for the claim
-    function claimAndReinvest(
-        address distributor,
-        uint256 cumulativeAmount,
-        uint8 positionType,
-        bytes32 positionId,
-        uint256 cycle,
-        bytes32[] calldata merkleProof,
-        bytes memory metadata
-    ) external {
+    /// @inheritdoc IFluidSupply
+    function claimAndReinvest(ClaimParams calldata claimParams) external onlyRole(MERKLE_CLAIMER_ROLE) {
         ClaimAndReinvestLocalVariables memory vars;
+
         vars.strategyContainer = _strategyContainer;
+        vars.merkleDistributor = merkleDistributor;
+        vars.underlyingAsset = underlyingAsset;
+        vars.underlyingAssetBalanceBefore = IERC20(vars.underlyingAsset).balanceOf(address(this));
+        vars.rewardToken = merkleRewardToken;
+        vars.fee = IStrategyContainer(vars.strategyContainer).feePct();
 
-        require(
-            AccessControlUpgradeable(vars.strategyContainer).hasRole(HARVEST_MANAGER_ROLE, msg.sender),
-            Errors.Unauthorized()
-        );
-
-        vars.rewardToken = IFluidMerkleDistributor(distributor).TOKEN();
-        vars.rewardsBalance = IERC20(vars.rewardToken).balanceOf(address(this));
-        IFluidMerkleDistributor(distributor).claim(
+        IFluidMerkleDistributor(vars.merkleDistributor).claim(
             address(this),
-            cumulativeAmount,
-            positionType,
-            positionId,
-            cycle,
-            merkleProof,
-            metadata
+            claimParams.cumulativeAmount,
+            claimParams.positionType,
+            claimParams.positionId,
+            claimParams.cycle,
+            claimParams.merkleProof,
+            claimParams.metadata
         );
 
-        if (IERC20(vars.rewardToken).balanceOf(address(this)) - vars.rewardsBalance > 0) {
-            vars.assetCached = asset;
-            vars.assetsBalance = IERC20(vars.assetCached).balanceOf(address(this));
-            _swapToInputTokens(vars.rewardToken, vars.assetCached, 0, false);
-            vars.rewardInAsset = IERC20(vars.assetCached).balanceOf(address(this)) - vars.assetsBalance;
-            vars.treasuryFee = vars.rewardInAsset.mulDiv(IStrategyContainer(vars.strategyContainer).feePct(), MAX_BPS);
-            if (vars.treasuryFee > 0)
-                IERC20(vars.assetCached).safeTransfer(
-                    IStrategyContainer(vars.strategyContainer).treasury(),
-                    vars.treasuryFee
-                );
+        if (IERC20(vars.rewardToken).balanceOf(address(this)) == 0) {
+            return;
+        }
+
+        _swapToInputTokens(vars.rewardToken, vars.underlyingAsset, 0, false);
+
+        vars.underlyingAssetIncome =
+            IERC20(vars.underlyingAsset).balanceOf(address(this)) - vars.underlyingAssetBalanceBefore;
+
+        if (vars.underlyingAssetIncome == 0) {
+            return;
+        }
+
+        if (vars.fee > 0) {
+            vars.feeToTreasury = vars.underlyingAssetIncome.mulDiv(vars.fee, MAX_BPS);
+            IERC20(vars.underlyingAsset).safeTransfer(
+                IStrategyContainer(vars.strategyContainer).treasury(),
+                vars.feeToTreasury
+            );
             _enterFluid();
         }
     }
 
     function _emergencyExit(bytes32 toStateId, uint256 share) internal override {
-        if (toStateId == TOKEN_ONLY_STATE_ID) {
+        if (toStateId == UNDERLYING_ASSET_STATE_ID) {
             _exitFluid(share);
         } else {
             revert StateNotFound(toStateId);
@@ -174,14 +200,13 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
     }
 
     function _enterFluid() internal {
-        address assetCached = asset;
+        address underlyingAssetCached = underlyingAsset;
         address fTokenCached = fToken;
-        uint256 balance = IERC20(assetCached).balanceOf(address(this));
-        if (balance > 0) {
-            IERC20(assetCached).safeIncreaseAllowance(fTokenCached, balance);
-            IFluidToken(fTokenCached).deposit(balance, address(this));
-            lastDepositBalance = IFluidToken(fTokenCached).previewRedeem(IERC20(fTokenCached).balanceOf(address(this)));
-        }
+        uint256 underlyingAssetBalance = IERC20(underlyingAssetCached).balanceOf(address(this));
+
+        IERC20(underlyingAssetCached).safeIncreaseAllowance(fTokenCached, underlyingAssetBalance);
+        IFluidToken(fTokenCached).deposit(underlyingAssetBalance, address(this));
+        lastFTokenBalance = IFluidToken(fTokenCached).convertToAssets(IERC20(fTokenCached).balanceOf(address(this)));
     }
 
     function _exitFluid(uint256 share) internal {
@@ -189,34 +214,30 @@ contract FluidSupply is IFluidSupply, StrategyTemplate {
         require(share <= MAX_BPS, Errors.IncorrectAmount());
 
         address fTokenCached = fToken;
-        uint256 liquidity = IERC20(fTokenCached).balanceOf(address(this)).mulDiv(share, MAX_BPS);
-        if (liquidity > 0) {
-            IERC20(fTokenCached).safeIncreaseAllowance(fTokenCached, liquidity);
-            IFluidToken(fTokenCached).redeem(liquidity, address(this), address(this));
-            lastDepositBalance = IFluidToken(fTokenCached).previewRedeem(IERC20(fTokenCached).balanceOf(address(this)));
-        }
+        uint256 fTokenAmountToRedeem = IERC20(fTokenCached).balanceOf(address(this)).mulDiv(share, MAX_BPS);
+
+        IERC20(fTokenCached).safeIncreaseAllowance(fTokenCached, fTokenAmountToRedeem);
+        IFluidToken(fTokenCached).redeem(fTokenAmountToRedeem, address(this), address(this));
+        lastFTokenBalance = IFluidToken(fTokenCached).convertToAssets(IERC20(fTokenCached).balanceOf(address(this)));
     }
 
     function _harvest(bytes32, address _treasury, uint256 _feePct) internal override {
         HarvestLocalVariables memory vars;
         vars.fToken = fToken;
-        vars.asset = asset;
-        vars.lastDepositBalance = lastDepositBalance;
-        vars.fTokensInAsset = IFluidToken(vars.fToken).previewRedeem(IERC20(vars.fToken).balanceOf(address(this)));
-        vars.incomeInAsset = vars.fTokensInAsset > vars.lastDepositBalance
-            ? vars.fTokensInAsset - vars.lastDepositBalance
-            : 0;
-        if (vars.incomeInAsset == 0) return;
+        vars.underlyingAsset = underlyingAsset;
+        vars.lastFTokenBalance = lastFTokenBalance;
+        vars.underlyingAssetBalance = IFluidToken(vars.fToken).convertToAssets(
+            IERC20(vars.fToken).balanceOf(address(this))
+        );
+        vars.incomeInAsset = vars.underlyingAssetBalance - vars.lastFTokenBalance;
 
-        vars.balanceBefore = IERC20(vars.asset).balanceOf(address(this));
-        vars.treasuryFee = vars.incomeInAsset.mulDiv(_feePct, MAX_BPS);
-        vars.shares = vars.treasuryFee.mulDiv(MAX_BPS, vars.fTokensInAsset);
-        if (vars.shares > 0) _exitFluid(vars.shares);
-        vars.balanceAfter = IERC20(vars.asset).balanceOf(address(this));
+        if (_feePct > 0) {
+            vars.feeToTreasury = vars.incomeInAsset.mulDiv(_feePct, MAX_BPS);
 
-        if (vars.balanceAfter - vars.balanceBefore < vars.treasuryFee) {
-            vars.treasuryFee = vars.balanceAfter - vars.balanceBefore;
+            IERC20(vars.fToken).safeIncreaseAllowance(vars.fToken, vars.feeToTreasury);
+            IFluidToken(vars.fToken).redeem(vars.feeToTreasury, _treasury, address(this));
         }
-        IERC20(vars.asset).safeTransfer(_treasury, vars.treasuryFee);
+
+        lastFTokenBalance = IFluidToken(vars.fToken).convertToAssets(IERC20(vars.fToken).balanceOf(address(this)));
     }
 }
