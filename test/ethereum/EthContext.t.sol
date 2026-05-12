@@ -6,13 +6,19 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 
 import {ChainlinkOracleWrapper} from "@shift-defi/core/priceOracles/ChainlinkOracleWrapper.sol";
 
+import {IVault} from "@shift-defi/core/interfaces/IVault.sol";
+import {IContainerLocal} from "@shift-defi/core/interfaces/IContainerLocal.sol";
 import {IPriceOracleAggregator} from "@shift-defi/core/interfaces/IPriceOracleAggregator.sol";
 import {IChainlinkOracleWrapper} from "@shift-defi/core/interfaces/IChainlinkOracleWrapper.sol";
 import {IStrategyContainer} from "@shift-defi/core/interfaces/IStrategyContainer.sol";
 
 import {BaseConfig} from "test/BaseConfig.sol";
 
+import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
+
 contract EthContext is BaseConfig {
+    using stdStorage for StdStorage;
+
     address internal constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address internal constant PYUSD = 0x6c3ea9036406852006290770BEdFcAbA0e23A0e8;
 
@@ -28,6 +34,7 @@ contract EthContext is BaseConfig {
 
     uint256 private constant PRICE_ORACLE_UPDATE_INTERVAL = 2400 * 3600;
     uint256 internal constant MAX_BPS = 1e18;
+    uint256 internal constant MAX_CONTAINER_WEIGHT = 10_000;
 
     address internal constant CURVE_GAUGE_PYUSD_USDC = 0x9da75997624C697444958aDeD6790bfCa96Af19A;
 
@@ -83,6 +90,11 @@ contract EthContext is BaseConfig {
         vm.stopPrank();
 
         treasury = IStrategyContainer(STRATEGY_CONTAINER).treasury();
+
+        if (!IStrategyContainer(STRATEGY_CONTAINER).isReshuffling()) {
+            vm.prank(roles.reshufflingManager);
+            IStrategyContainer(STRATEGY_CONTAINER).enableReshufflingMode();
+        }
     }
 
     function _proxify(address implementation, bytes memory data) internal returns (address) {
@@ -138,5 +150,13 @@ contract EthContext is BaseConfig {
 
         vm.prank(roles.reshufflingExecutor);
         IStrategyContainer(STRATEGY_CONTAINER).disableReshufflingMode();
+    }
+
+    function _setVaultStatus(IVault.VaultStatus status) internal {
+        stdstore.target(VAULT).sig(IVault.status.selector).checked_write(uint256(status));
+    }
+
+    function _setContainerLocalStatus(IContainerLocal.ContainerLocalStatus status) internal {
+        stdstore.target(STRATEGY_CONTAINER).sig(IContainerLocal.status.selector).checked_write(uint256(status));
     }
 }

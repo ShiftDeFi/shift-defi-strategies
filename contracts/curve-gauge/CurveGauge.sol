@@ -32,8 +32,14 @@ abstract contract CurveGauge is StrategyTemplate {
         _disableInitializers();
     }
 
-    function initialize(address strategyContainer, address _gauge) external initializer {
-        __StrategyTemplate_init(strategyContainer);
+    function initialize(
+        address strategyContainer,
+        address _gauge,
+        uint256 _enterMaxSlippage,
+        uint256 _exitMaxSlippage,
+        uint256 _emergencyExitMaxSlippage
+    ) external initializer {
+        __StrategyTemplate_init(strategyContainer, _enterMaxSlippage, _exitMaxSlippage, _emergencyExitMaxSlippage);
 
         swapRouter = IContainer(strategyContainer).swapRouter();
 
