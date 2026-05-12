@@ -16,8 +16,6 @@ import {ILiquidityGaugeV6} from "contracts/dependencies/curve/ILiquidityGaugeV6.
 
 import {EthContext} from "test/ethereum/EthContext.t.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
-
 abstract contract CurveGaugePyusdUsdcBase is EthContext {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -31,6 +29,10 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
     uint256 internal constant NAV_TOLERANCE_PCT = 2e14; // 0.02%
     uint256 internal constant NAV_TOLERANCE_PCT_LOW = 1e8; // 0.000001%
 
+    uint256 internal constant ENTER_MAX_SLIPPAGE = 5e16; // 5%
+    uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
+    uint256 internal constant EMERGENCY_EXIT_MAX_SLIPPAGE = 5e16; // 5%
+
     bytes32 internal constant ONLY_NOTION_STATE_ID = keccak256("ONLY_NOTION_STATE_ID");
     bytes32 internal constant UNDERLYING_ASSETS_STATE_ID = keccak256("UNDERLYING_ASSETS_STATE_ID");
     bytes32 internal constant CURVE_LP_STATE_ID = keccak256("CURVE_LP_STATE_ID");
@@ -43,7 +45,14 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
         curveGaugePyusdUsdc = IStrategyTemplate(
             _proxify(
                 implementation,
-                abi.encodeWithSelector(CurveGauge.initialize.selector, STRATEGY_CONTAINER, CURVE_GAUGE_PYUSD_USDC)
+                abi.encodeWithSelector(
+                    CurveGauge.initialize.selector,
+                    STRATEGY_CONTAINER,
+                    CURVE_GAUGE_PYUSD_USDC,
+                    ENTER_MAX_SLIPPAGE,
+                    EXIT_MAX_SLIPPAGE,
+                    EMERGENCY_EXIT_MAX_SLIPPAGE
+                )
             )
         );
 
@@ -74,7 +83,13 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
         IERC20(PYUSD).forceApprove(address(curveGaugePyusdUsdc), type(uint256).max);
         IERC20(USDC).forceApprove(address(curveGaugePyusdUsdc), type(uint256).max);
 
-        IStrategyTemplate(curveGaugePyusdUsdc).enter(amounts, 0);
+        uint256 minAsset0Delta = amounts[0].mulDiv(MAX_BPS - ENTER_MAX_SLIPPAGE / 2, MAX_BPS);
+        uint256 minAsset1Delta = amounts[1].mulDiv(MAX_BPS - ENTER_MAX_SLIPPAGE / 2, MAX_BPS);
+
+        uint256 minNavDelta0 = curveGaugePyusdUsdc.getTokenAmountInNotion(USDC, minAsset0Delta);
+        uint256 minNavDelta1 = curveGaugePyusdUsdc.getTokenAmountInNotion(PYUSD, minAsset1Delta);
+
+        IStrategyTemplate(curveGaugePyusdUsdc).enter(amounts, minNavDelta0 + minNavDelta1);
 
         vm.stopPrank();
     }
@@ -152,8 +167,8 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
         _enterStrategy();
 
         // Simulate reward accrual window on the fork before harvesting.
-        vm.warp(block.timestamp + 10 minutes);
-        vm.roll(block.number + 2);
+        vm.warp(block.timestamp + 100 minutes);
+        vm.roll(block.number + 100);
 
         uint256 treasuryBalanceBefore = IERC20(PYUSD).balanceOf(treasury);
 

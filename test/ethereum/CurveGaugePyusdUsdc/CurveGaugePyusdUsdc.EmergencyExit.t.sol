@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IVault} from "@shift-defi/core/interfaces/IVault.sol";
 import {IContainerLocal} from "@shift-defi/core/interfaces/IContainerLocal.sol";
+import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
 
 import {ICurveStableSwapNG} from "contracts/dependencies/curve/ICurveStableSwapNG.sol";
 import {ILiquidityGaugeV6} from "contracts/dependencies/curve/ILiquidityGaugeV6.sol";
@@ -43,10 +44,63 @@ contract CurveGaugePyusdUsdcEmergencyExitTest is CurveGaugePyusdUsdcBase {
         uint256[] memory inputAmounts = new uint256[](2);
         inputAmounts[0] = inputAmountPyusd;
         inputAmounts[1] = inputAmountUsdc;
+
+        uint256 minAsset0Delta = inputAmountUsdc.mulDiv(MAX_BPS - ENTER_MAX_SLIPPAGE / 2, MAX_BPS);
+        uint256 minAsset1Delta = inputAmountPyusd.mulDiv(MAX_BPS - ENTER_MAX_SLIPPAGE / 2, MAX_BPS);
+
+        uint256 minNavDelta0 = curveGaugePyusdUsdc.getTokenAmountInNotion(USDC, minAsset0Delta);
+        uint256 minNavDelta1 = curveGaugePyusdUsdc.getTokenAmountInNotion(PYUSD, minAsset1Delta);
+
+        _setVaultStatus(IVault.VaultStatus.Idle);
+
+        (address[] memory containers, uint256[] memory containerWeights) = IVault(VAULT).getContainers();
+
+        for (uint256 i = 0; i < containers.length; ++i) {
+            if (containers[i] == STRATEGY_CONTAINER) {
+                containerWeights[i] = MAX_CONTAINER_WEIGHT;
+            } else {
+                containerWeights[i] = 0;
+            }
+        }
+
+        // Sort containers and weights. Sort key is containers[i] < containers[i+1]
+        for (uint256 i = 0; i < containers.length; ++i) {
+            for (uint256 j = i + 1; j < containers.length; ++j) {
+                if (containers[j] < containers[i]) {
+                    // Swap containers
+                    address tempContainer = containers[i];
+                    containers[i] = containers[j];
+                    containers[j] = tempContainer;
+                    // Swap corresponding weights
+                    uint256 tempWeight = containerWeights[i];
+                    containerWeights[i] = containerWeights[j];
+                    containerWeights[j] = tempWeight;
+                }
+            }
+        }
+
+        vm.prank(roles.reshufflingManager);
+        IVault(VAULT).enableReshufflingMode();
+
+        vm.prank(roles.containerManager);
+        IVault(VAULT).setContainerWeights(containers, containerWeights);
+
+        vm.prank(roles.reshufflingExecutor);
+        IVault(VAULT).disableReshufflingMode();
+
         vm.startPrank(roles.operator);
         IVault(VAULT).startDepositBatchProcessing();
+
+        // TODO: Implement batch swap
         // IContainer(STRATEGY_CONTAINER).prepareLiquidity(swapInstructions);
-        IContainerLocal(STRATEGY_CONTAINER).enterStrategy(address(curveGaugePyusdUsdc), inputAmounts, 0);
+
+        IContainerLocal(STRATEGY_CONTAINER).enterStrategy(
+            address(curveGaugePyusdUsdc),
+            inputAmounts,
+            minNavDelta0 + minNavDelta1
+        );
+        _setContainerLocalStatus(IContainerLocal.ContainerLocalStatus.AllStrategiesEntered);
+
         IContainerLocal(STRATEGY_CONTAINER).reportDeposit();
         IVault(VAULT).resolveDepositBatch();
         vm.stopPrank();
@@ -56,8 +110,9 @@ contract CurveGaugePyusdUsdcEmergencyExitTest is CurveGaugePyusdUsdcBase {
     }
 
     function test_EmergencyExit_ToCurveLp() public {
+        uint256 stateNav = IStrategyTemplate(curveGaugePyusdUsdc).stateNav(CURVE_GAUGE_STATE_ID);
         vm.startPrank(roles.emergencyExecutor);
-        curveGaugePyusdUsdc.emergencyExit(CURVE_LP_STATE_ID, MAX_BPS, 0);
+        curveGaugePyusdUsdc.emergencyExit(CURVE_LP_STATE_ID, MAX_BPS, stateNav);
         vm.stopPrank();
     }
 }
