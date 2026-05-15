@@ -1,11 +1,12 @@
 #!/bin/sh
 
 npx lint-staged
-forge test -vvv
 
 if [ $? -ne 0 ]; then
     echo "Forge tests failed! Commit aborted."
     exit 1
 fi
+
+./.husky/test-eth.sh
 
 exit 0
