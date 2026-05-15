@@ -18,6 +18,8 @@ contract CurveGaugePyusdUsdc is CurveGauge {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
+    error SwapFailed(address token0, address token1, uint256 amount);
+
     function _enterUnderlyingAssets() internal override {
         address underlyingAsset0Cached = underlyingAsset0;
         address underlyingAsset1Cached = underlyingAsset1;
@@ -39,25 +41,31 @@ contract CurveGaugePyusdUsdc is CurveGauge {
             asset1BalanceInNotion - targetBalanceAsset1InNotion
         );
 
-        ISwapRouter(IContainer(_strategyContainer).swapRouter()).tryPredefinedSwap(
+        (bool success, ) = ISwapRouter(IContainer(_strategyContainer).swapRouter()).tryPredefinedSwap(
             underlyingAsset1Cached,
             underlyingAsset0Cached,
             amountToSwap,
             0
         );
+
+        require(success, SwapFailed(underlyingAsset1Cached, underlyingAsset0Cached, amountToSwap));
     }
 
     function _exitUnderlyingAssets(uint256 share) internal override {
         address underlyingAsset0Cached = underlyingAsset0;
+        address underlyingAsset1Cached = underlyingAsset1;
+
         uint256 amount0 = IERC20(underlyingAsset0Cached).balanceOf(address(this));
         uint256 amountToSwap = amount0.mulDiv(share, MAX_BPS);
 
-        ISwapRouter(IContainer(_strategyContainer).swapRouter()).tryPredefinedSwap(
+        (bool success, ) = ISwapRouter(IContainer(_strategyContainer).swapRouter()).tryPredefinedSwap(
             underlyingAsset0Cached,
-            underlyingAsset1,
+            underlyingAsset1Cached,
             amountToSwap,
             0
         );
+
+        require(success, SwapFailed(underlyingAsset0Cached, underlyingAsset1Cached, amountToSwap));
     }
 
     function _harvest(bytes32 _stateId, address _treasury, uint256 _feePct) internal override {
