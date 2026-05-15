@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+import {IContainer} from "@shift-defi/core/interfaces/IContainer.sol";
 import {ISwapRouter} from "@shift-defi/core/interfaces/ISwapRouter.sol";
 import {Common} from "@shift-defi/core/libraries/Common.sol";
 
@@ -38,7 +39,12 @@ contract CurveGaugePyusdUsdc is CurveGauge {
             asset1BalanceInNotion - targetBalanceAsset1InNotion
         );
 
-        ISwapRouter(swapRouter).tryPredefinedSwap(underlyingAsset1Cached, underlyingAsset0Cached, amountToSwap, 0);
+        ISwapRouter(IContainer(_strategyContainer).swapRouter()).tryPredefinedSwap(
+            underlyingAsset1Cached,
+            underlyingAsset0Cached,
+            amountToSwap,
+            0
+        );
     }
 
     function _exitUnderlyingAssets(uint256 share) internal override {
@@ -46,7 +52,12 @@ contract CurveGaugePyusdUsdc is CurveGauge {
         uint256 amount0 = IERC20(underlyingAsset0Cached).balanceOf(address(this));
         uint256 amountToSwap = amount0.mulDiv(share, MAX_BPS);
 
-        ISwapRouter(swapRouter).tryPredefinedSwap(underlyingAsset0Cached, underlyingAsset1, amountToSwap, 0);
+        ISwapRouter(IContainer(_strategyContainer).swapRouter()).tryPredefinedSwap(
+            underlyingAsset0Cached,
+            underlyingAsset1,
+            amountToSwap,
+            0
+        );
     }
 
     function _harvest(bytes32 _stateId, address _treasury, uint256 _feePct) internal override {

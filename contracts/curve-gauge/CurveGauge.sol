@@ -21,7 +21,6 @@ abstract contract CurveGauge is StrategyTemplate {
     address public lpToken;
     address public underlyingAsset0;
     address public underlyingAsset1;
-    address internal swapRouter;
 
     bytes32 internal constant ONLY_NOTION_STATE_ID = keccak256("ONLY_NOTION_STATE_ID");
     bytes32 internal constant UNDERLYING_ASSETS_STATE_ID = keccak256("UNDERLYING_ASSETS_STATE_ID");
@@ -40,8 +39,6 @@ abstract contract CurveGauge is StrategyTemplate {
         uint256 _emergencyExitMaxSlippage
     ) external initializer {
         __StrategyTemplate_init(strategyContainer, _enterMaxSlippage, _exitMaxSlippage, _emergencyExitMaxSlippage);
-
-        swapRouter = IContainer(strategyContainer).swapRouter();
 
         require(_gauge != address(0), Errors.ZeroAddress());
         gauge = _gauge;
