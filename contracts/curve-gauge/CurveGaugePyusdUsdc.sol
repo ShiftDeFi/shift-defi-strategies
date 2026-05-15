@@ -96,8 +96,6 @@ contract CurveGaugePyusdUsdc is CurveGauge {
         IERC20(underlyingAsset0).safeIncreaseAllowance(lpTokenCached, claimedRewards);
         ICurveStableSwapNG(lpTokenCached).add_liquidity(amounts, 0);
 
-        uint256 lpBalance = IERC20(lpTokenCached).balanceOf(address(this));
-        IERC20(lpTokenCached).safeIncreaseAllowance(gaugeCached, lpBalance);
-        ILiquidityGaugeV6(gaugeCached).deposit(lpBalance);
+        _enterCurveGauge();
     }
 }
