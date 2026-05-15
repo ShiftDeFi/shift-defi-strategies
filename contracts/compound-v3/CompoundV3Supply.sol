@@ -8,7 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {StrategyTemplate} from "@shift-defi/core/StrategyTemplate.sol";
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
-import {Errors} from "@shift-defi/core/libraries/helpers/Errors.sol";
+import {Errors} from "@shift-defi/core/libraries/Errors.sol";
 
 import {ICompoundV3Supply} from "../interfaces/ICompoundV3Supply.sol";
 import {IcASSETv3, IcRewards} from "../dependencies/compound-v3/ICompoundV3.sol";
@@ -109,7 +109,7 @@ contract CompoundV3Supply is ICompoundV3Supply, StrategyTemplate {
         _swapToInputTokens(compToken, vars.depositToken, 0, false);
 
         vars.compRewardsInAsset = IERC20(vars.depositToken).balanceOf(address(this)) - vars.beforeBalance;
-        vars.treasuryFee = (vars.compRewardsInAsset + vars.cTokenIncomeInAsset).mulDiv(_feePct, BPS);
+        vars.treasuryFee = (vars.compRewardsInAsset + vars.cTokenIncomeInAsset).mulDiv(_feePct, MAX_BPS);
 
         if (vars.compRewardsInAsset >= vars.treasuryFee) {
             if (vars.treasuryFee > 0) {
@@ -179,7 +179,7 @@ contract CompoundV3Supply is ICompoundV3Supply, StrategyTemplate {
         InternalExitLocalVars memory vars;
         vars.cToken = cToken;
         vars.balance = IERC20(vars.cToken).balanceOf(address(this));
-        vars.liquidity = vars.balance.mulDiv(share, BPS, Math.Rounding.Floor);
+        vars.liquidity = vars.balance.mulDiv(share, MAX_BPS, Math.Rounding.Floor);
         if (vars.liquidity > 0) {
             IcASSETv3(vars.cToken).withdraw(depositToken, vars.liquidity);
         }
