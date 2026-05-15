@@ -5,8 +5,7 @@ if [ -z "${ETH_RPC_URL:-}" ]; then
   exit 1
 fi
 
-forge test -vvv --mp "test/ethereum/**" --fork-url $ETH_RPC_URL
-
+forge test -vvv --mp "test/ethereum/**" --fork-url $ETH_RPC_URL --via-ir
 if [ $? -ne 0 ]; then
     echo "Forge tests failed! Commit aborted."
     exit 1

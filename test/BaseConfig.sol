@@ -30,6 +30,7 @@ abstract contract BaseConfig is Test {
         address emergencyManager;
         address emergencyExecutor;
         address oracleManager;
+        address merkleClaimer;
     }
 
     struct Users {
@@ -55,6 +56,7 @@ abstract contract BaseConfig is Test {
         roles.emergencyManager = makeAddr("EMERGENCY_MANAGER");
         roles.emergencyExecutor = makeAddr("EMERGENCY_EXECUTOR");
         roles.oracleManager = makeAddr("ORACLE_MANAGER");
+        roles.merkleClaimer = makeAddr("MERKLE_CLAIMER");
 
         users.alice = makeAddr("ALICE");
         users.bob = makeAddr("BOB");
