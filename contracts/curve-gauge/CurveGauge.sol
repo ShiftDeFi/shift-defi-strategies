@@ -114,6 +114,10 @@ abstract contract CurveGauge is StrategyTemplate {
         amounts[0] = IERC20(underlyingAsset0).balanceOf(address(this));
         amounts[1] = IERC20(underlyingAsset1).balanceOf(address(this));
 
+        if (amounts[0] == 0 && amounts[1] == 0) {
+            return;
+        }
+
         IERC20(underlyingAsset0).safeIncreaseAllowance(lpToken, amounts[0]);
         IERC20(underlyingAsset1).safeIncreaseAllowance(lpToken, amounts[1]);
 
@@ -125,6 +129,11 @@ abstract contract CurveGauge is StrategyTemplate {
         address gaugeCached = gauge;
 
         uint256 lpBalance = IERC20(lpTokenCached).balanceOf(address(this));
+
+        if (lpBalance == 0) {
+            return;
+        }
+
         IERC20(lpTokenCached).safeIncreaseAllowance(gaugeCached, lpBalance);
         ILiquidityGaugeV6(gaugeCached).deposit(lpBalance);
     }
@@ -154,6 +163,10 @@ abstract contract CurveGauge is StrategyTemplate {
         uint256 lpBalance = IERC20(lpTokenCached).balanceOf(address(this));
         uint256 lpToWithdraw = lpBalance.mulDiv(share, MAX_BPS);
 
+        if (lpToWithdraw == 0) {
+            return;
+        }
+
         uint256[] memory minAmountsOut = new uint256[](2);
 
         ICurveStableSwapNG(lpTokenCached).remove_liquidity(lpToWithdraw, minAmountsOut);
@@ -162,8 +175,13 @@ abstract contract CurveGauge is StrategyTemplate {
     function _exitCurveGauge(uint256 share) internal {
         address gaugeCached = gauge;
         uint256 gaugeBalance = ILiquidityGaugeV6(gaugeCached).balanceOf(address(this));
-        uint256 lpToWithdraw = gaugeBalance.mulDiv(share, MAX_BPS);
-        ILiquidityGaugeV6(gaugeCached).withdraw(lpToWithdraw);
+        uint256 gaugeLpToWithdraw = gaugeBalance.mulDiv(share, MAX_BPS);
+
+        if (gaugeLpToWithdraw == 0) {
+            return;
+        }
+
+        ILiquidityGaugeV6(gaugeCached).withdraw(gaugeLpToWithdraw);
     }
 
     function _exitTarget(uint256 share) internal override {
@@ -184,25 +202,27 @@ abstract contract CurveGauge is StrategyTemplate {
     }
 
     function _emergencyExit(bytes32 toStateId, uint256 share) internal override {
-        address gaugeCached = gauge;
+        bytes32 currentStateId = currentStateId();
         if (toStateId == CURVE_LP_STATE_ID) {
             _exitCurveGauge(share);
         } else if (toStateId == UNDERLYING_ASSETS_STATE_ID) {
-            // TODO: Check this function
-            if (IERC20(gaugeCached).balanceOf(address(this)) > 0) {
+            if (currentStateId == CURVE_GAUGE_STATE_ID) {
                 _exitCurveGauge(share);
                 _exitCurveLp(MAX_BPS);
             } else {
                 _exitCurveLp(share);
             }
         } else if (toStateId == ONLY_NOTION_STATE_ID) {
-            if (IERC20(gaugeCached).balanceOf(address(this)) > 0) {
+            if (currentStateId == CURVE_GAUGE_STATE_ID) {
                 _exitCurveGauge(share);
-            }
-            if (IERC20(lpToken).balanceOf(address(this)) > 0) {
+                _exitCurveLp(MAX_BPS);
+                _exitUnderlyingAssets(MAX_BPS);
+            } else if (currentStateId == CURVE_LP_STATE_ID) {
                 _exitCurveLp(share);
+                _exitUnderlyingAssets(MAX_BPS);
+            } else {
+                _exitUnderlyingAssets(share);
             }
-            _exitUnderlyingAssets(share);
         } else {
             revert StateNotFound(toStateId);
         }
