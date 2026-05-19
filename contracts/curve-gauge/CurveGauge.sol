@@ -21,7 +21,6 @@ abstract contract CurveGauge is StrategyTemplate {
     address public lpToken;
     address public underlyingAsset0;
     address public underlyingAsset1;
-    address internal swapRouter;
 
     bytes32 internal constant ONLY_NOTION_STATE_ID = keccak256("ONLY_NOTION_STATE_ID");
     bytes32 internal constant UNDERLYING_ASSETS_STATE_ID = keccak256("UNDERLYING_ASSETS_STATE_ID");
@@ -40,8 +39,6 @@ abstract contract CurveGauge is StrategyTemplate {
         uint256 _emergencyExitMaxSlippage
     ) external initializer {
         __StrategyTemplate_init(strategyContainer, _enterMaxSlippage, _exitMaxSlippage, _emergencyExitMaxSlippage);
-
-        swapRouter = IContainer(strategyContainer).swapRouter();
 
         require(_gauge != address(0), Errors.ZeroAddress());
         gauge = _gauge;
@@ -127,22 +124,24 @@ abstract contract CurveGauge is StrategyTemplate {
         address lpTokenCached = lpToken;
         address gaugeCached = gauge;
 
-        _enterCurveLp();
-
         uint256 lpBalance = IERC20(lpTokenCached).balanceOf(address(this));
         IERC20(lpTokenCached).safeIncreaseAllowance(gaugeCached, lpBalance);
         ILiquidityGaugeV6(gaugeCached).deposit(lpBalance);
     }
 
     function _enterTarget() internal override {
+        _enterCurveLp();
         _enterCurveGauge();
     }
 
     function _enterState(bytes32 stateId) internal override {
         if (stateId == CURVE_GAUGE_STATE_ID) {
+            _enterCurveLp();
             _enterCurveGauge();
         } else if (stateId == CURVE_LP_STATE_ID) {
             _enterCurveLp();
+        } else if (stateId == UNDERLYING_ASSETS_STATE_ID) {
+            _enterUnderlyingAssets();
         } else {
             revert StateNotFound(stateId);
         }
@@ -177,6 +176,8 @@ abstract contract CurveGauge is StrategyTemplate {
             _exitCurveGauge(share);
         } else if (stateId == CURVE_LP_STATE_ID) {
             _exitCurveLp(share);
+        } else if (stateId == UNDERLYING_ASSETS_STATE_ID) {
+            _exitUnderlyingAssets(share);
         } else {
             revert StateNotFound(stateId);
         }
