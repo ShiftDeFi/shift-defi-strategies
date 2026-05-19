@@ -71,6 +71,7 @@ abstract contract CurveGauge is StrategyTemplate {
     }
 
     function _onlyNotionNav() internal view returns (uint256) {
+        // TODO: This is non-zero in underlyingAssets stateId
         address notionCached = _notion;
         return getTokenAmountInNotion(notionCached, IERC20(notionCached).balanceOf(address(this)));
     }
@@ -186,10 +187,13 @@ abstract contract CurveGauge is StrategyTemplate {
         if (toStateId == CURVE_LP_STATE_ID) {
             _exitCurveGauge(share);
         } else if (toStateId == UNDERLYING_ASSETS_STATE_ID) {
+            // TODO: Check this function
             if (IERC20(gaugeCached).balanceOf(address(this)) > 0) {
                 _exitCurveGauge(share);
+                _exitCurveLp(MAX_BPS);
+            } else {
+                _exitCurveLp(share);
             }
-            _exitCurveLp(share);
         } else if (toStateId == ONLY_NOTION_STATE_ID) {
             if (IERC20(gaugeCached).balanceOf(address(this)) > 0) {
                 _exitCurveGauge(share);
