@@ -16,14 +16,14 @@ import {ILiquidityGaugeV6} from "contracts/dependencies/curve/ILiquidityGaugeV6.
 
 import {EthContext} from "test/ethereum/EthContext.t.sol";
 
-abstract contract CurveGaugePyusdUsdcBase is EthContext {
+abstract contract CurveGaugeRlusdUsdcBase is EthContext {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-    IStrategyTemplate internal curveGaugePyusdUsdc;
+    IStrategyTemplate internal curveGaugeRlusdUsdc;
 
     uint256 internal enterAmountUsdc;
-    uint256 internal enterAmountPyusd;
+    uint256 internal enterAmountRlusd;
 
     uint256 internal constant ENTER_AMOUNT = 100_000; // 100k
     uint256 internal constant NAV_TOLERANCE_PCT = 2e14; // 0.02%
@@ -41,13 +41,13 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
         super.setUp();
 
         address implementation = address(new CurveGauge());
-        curveGaugePyusdUsdc = IStrategyTemplate(
+        curveGaugeRlusdUsdc = IStrategyTemplate(
             _proxify(
                 implementation,
                 abi.encodeWithSelector(
                     CurveGauge.initialize.selector,
                     mockStrategyContainer,
-                    CURVE_GAUGE_PYUSD_USDC,
+                    CURVE_GAUGE_RLUSD_USDC,
                     ENTER_MAX_SLIPPAGE,
                     EXIT_MAX_SLIPPAGE,
                     EMERGENCY_EXIT_MAX_SLIPPAGE
@@ -55,45 +55,45 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
             )
         );
 
-        vm.label(address(curveGaugePyusdUsdc), "CURVE_GAUGE_PYUSD_USDC");
+        vm.label(address(curveGaugeRlusdUsdc), "CURVE_GAUGE_RLUSD_USDC");
 
-        address pool = ILiquidityGaugeV6(CURVE_GAUGE_PYUSD_USDC).lp_token();
+        address pool = ILiquidityGaugeV6(CURVE_GAUGE_RLUSD_USDC).lp_token();
         uint256[] memory balances = ICurveStableSwapNG(pool).get_balances();
-        uint256 totalReserve = Common.toUnifiedDecimalsUint8(PYUSD, balances[0]) +
-            Common.toUnifiedDecimalsUint8(USDC, balances[1]);
-        enterAmountPyusd =
-            ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(PYUSD, balances[0]), totalReserve) *
-            10 ** uint256(IERC20Metadata(PYUSD).decimals());
+        uint256 totalReserve = Common.toUnifiedDecimalsUint8(USDC, balances[0]) +
+            Common.toUnifiedDecimalsUint8(RLUSD, balances[1]);
         enterAmountUsdc =
-            ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(USDC, balances[1]), totalReserve) *
+            ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(USDC, balances[0]), totalReserve) *
             10 ** uint256(IERC20Metadata(USDC).decimals());
+        enterAmountRlusd =
+            ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(RLUSD, balances[1]), totalReserve) *
+            10 ** uint256(IERC20Metadata(RLUSD).decimals());
 
         address[] memory inputTokens = new address[](2);
-        inputTokens[0] = PYUSD;
-        inputTokens[1] = USDC;
+        inputTokens[0] = USDC;
+        inputTokens[1] = RLUSD;
 
-        _addStrategy(address(curveGaugePyusdUsdc), inputTokens, inputTokens);
+        _addStrategy(address(curveGaugeRlusdUsdc), inputTokens, inputTokens);
     }
 
     function _enterStrategy() internal {
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = enterAmountPyusd;
-        amounts[1] = enterAmountUsdc;
+        amounts[0] = enterAmountUsdc;
+        amounts[1] = enterAmountRlusd;
 
-        deal(PYUSD, mockStrategyContainer, enterAmountPyusd, true);
         deal(USDC, mockStrategyContainer, enterAmountUsdc, true);
+        deal(RLUSD, mockStrategyContainer, enterAmountRlusd, true);
 
         vm.startPrank(mockStrategyContainer);
-        IERC20(PYUSD).forceApprove(address(curveGaugePyusdUsdc), type(uint256).max);
-        IERC20(USDC).forceApprove(address(curveGaugePyusdUsdc), type(uint256).max);
+        IERC20(USDC).forceApprove(address(curveGaugeRlusdUsdc), type(uint256).max);
+        IERC20(RLUSD).forceApprove(address(curveGaugeRlusdUsdc), type(uint256).max);
 
         uint256 minAsset0Delta = amounts[0].mulDiv(MAX_BPS - ENTER_MAX_SLIPPAGE / 2, MAX_BPS);
         uint256 minAsset1Delta = amounts[1].mulDiv(MAX_BPS - ENTER_MAX_SLIPPAGE / 2, MAX_BPS);
 
-        uint256 minNavDelta0 = curveGaugePyusdUsdc.getTokenAmountInNotion(USDC, minAsset0Delta);
-        uint256 minNavDelta1 = curveGaugePyusdUsdc.getTokenAmountInNotion(PYUSD, minAsset1Delta);
+        uint256 minNavDelta0 = curveGaugeRlusdUsdc.getTokenAmountInNotion(USDC, minAsset0Delta);
+        uint256 minNavDelta1 = curveGaugeRlusdUsdc.getTokenAmountInNotion(RLUSD, minAsset1Delta);
 
-        IStrategyTemplate(curveGaugePyusdUsdc).enter(amounts, minNavDelta0 + minNavDelta1);
+        IStrategyTemplate(curveGaugeRlusdUsdc).enter(amounts, minNavDelta0 + minNavDelta1);
 
         vm.stopPrank();
     }
@@ -103,14 +103,14 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
 
         uint256 partialShare = MAX_BPS / 2;
 
-        uint256 curveGaugeNavBefore = IStrategyTemplate(curveGaugePyusdUsdc).stateNav(CURVE_GAUGE_STATE_ID);
+        uint256 curveGaugeNavBefore = IStrategyTemplate(curveGaugeRlusdUsdc).stateNav(CURVE_GAUGE_STATE_ID);
         uint256 maxNavDelta = curveGaugeNavBefore.mulDiv(partialShare, MAX_BPS);
 
         vm.startPrank(mockStrategyContainer);
-        IStrategyTemplate(curveGaugePyusdUsdc).exit(partialShare, maxNavDelta);
+        IStrategyTemplate(curveGaugeRlusdUsdc).exit(partialShare, maxNavDelta);
         vm.stopPrank();
 
-        uint256 curveGaugeNavAfter = IStrategyTemplate(curveGaugePyusdUsdc).stateNav(CURVE_GAUGE_STATE_ID);
+        uint256 curveGaugeNavAfter = IStrategyTemplate(curveGaugeRlusdUsdc).stateNav(CURVE_GAUGE_STATE_ID);
 
         assertApproxEqRel(
             curveGaugeNavAfter,
@@ -120,23 +120,23 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
         );
 
         assertEq(
-            IStrategyTemplate(curveGaugePyusdUsdc).stateNav(CURVE_LP_STATE_ID),
+            IStrategyTemplate(curveGaugeRlusdUsdc).stateNav(CURVE_LP_STATE_ID),
             0,
             "test_ExitTarget_Partial: Curve LP NAV"
         );
 
         assertApproxEqRel(
-            IStrategyTemplate(curveGaugePyusdUsdc).stateNav(UNDERLYING_ASSETS_STATE_ID),
+            IStrategyTemplate(curveGaugeRlusdUsdc).stateNav(UNDERLYING_ASSETS_STATE_ID),
             curveGaugeNavBefore - curveGaugeNavAfter,
             NAV_TOLERANCE_PCT,
             "test_ExitTarget_Partial: Underlying Assets NAV"
         );
 
-        uint256 exitedUsdcAmount = IERC20(USDC).balanceOf(address(curveGaugePyusdUsdc));
-        uint256 exitedPyusdAmount = IERC20(PYUSD).balanceOf(address(curveGaugePyusdUsdc));
+        uint256 exitedUsdcAmount = IERC20(USDC).balanceOf(address(curveGaugeRlusdUsdc));
+        uint256 exitedRlusdAmount = IERC20(RLUSD).balanceOf(address(curveGaugeRlusdUsdc));
 
         uint256 exitedNav = Common.toUnifiedDecimalsUint8(USDC, exitedUsdcAmount) +
-            Common.toUnifiedDecimalsUint8(PYUSD, exitedPyusdAmount);
+            Common.toUnifiedDecimalsUint8(RLUSD, exitedRlusdAmount);
 
         assertApproxEqRel(
             exitedNav,
@@ -149,18 +149,18 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
     function test_ExitTarget_Full() public {
         _enterStrategy();
 
-        uint256 curveGaugeNavBefore = IStrategyTemplate(curveGaugePyusdUsdc).stateNav(CURVE_GAUGE_STATE_ID);
+        uint256 curveGaugeNavBefore = IStrategyTemplate(curveGaugeRlusdUsdc).stateNav(CURVE_GAUGE_STATE_ID);
 
         vm.startPrank(mockStrategyContainer);
-        curveGaugePyusdUsdc.exit(MAX_BPS, curveGaugeNavBefore);
+        curveGaugeRlusdUsdc.exit(MAX_BPS, curveGaugeNavBefore);
         vm.stopPrank();
 
-        assertEq(curveGaugePyusdUsdc.stateNav(CURVE_GAUGE_STATE_ID), 0, "test_ExitTarget_Full: Curve Gauge NAV");
+        assertEq(curveGaugeRlusdUsdc.stateNav(CURVE_GAUGE_STATE_ID), 0, "test_ExitTarget_Full: Curve Gauge NAV");
 
-        assertEq(curveGaugePyusdUsdc.stateNav(CURVE_LP_STATE_ID), 0, "test_ExitTarget_Full: Curve LP NAV");
+        assertEq(curveGaugeRlusdUsdc.stateNav(CURVE_LP_STATE_ID), 0, "test_ExitTarget_Full: Curve LP NAV");
 
         assertApproxEqRel(
-            curveGaugePyusdUsdc.stateNav(UNDERLYING_ASSETS_STATE_ID),
+            curveGaugeRlusdUsdc.stateNav(UNDERLYING_ASSETS_STATE_ID),
             curveGaugeNavBefore,
             NAV_TOLERANCE_PCT_LOW,
             "test_ExitTarget_Full: Underlying Assets NAV"
@@ -174,13 +174,13 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
         vm.warp(block.timestamp + 100 minutes);
         vm.roll(block.number + 100);
 
-        uint256 treasuryBalanceBefore = IERC20(CURVE_GAUGE_PYUSD_USDC).balanceOf(treasury);
+        uint256 treasuryBalanceBefore = IERC20(CURVE_GAUGE_RLUSD_USDC).balanceOf(treasury);
 
         vm.startPrank(mockStrategyContainer);
-        curveGaugePyusdUsdc.harvest();
+        curveGaugeRlusdUsdc.harvest();
         vm.stopPrank();
 
-        uint256 treasuryBalanceAfter = IERC20(CURVE_GAUGE_PYUSD_USDC).balanceOf(treasury);
+        uint256 treasuryBalanceAfter = IERC20(CURVE_GAUGE_RLUSD_USDC).balanceOf(treasury);
         assertGt(treasuryBalanceAfter, treasuryBalanceBefore, "test_Harvest: no treasury rewards");
     }
 }
