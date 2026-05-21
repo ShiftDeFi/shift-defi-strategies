@@ -223,11 +223,11 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         vars.currentGaugeBalance = ILiquidityGaugeV6(vars.gaugeCached).balanceOf(address(this));
         vars.currentVirtualPrice = ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price();
 
-        vars.lpValueDelta =
-            (vars.currentGaugeBalance * vars.currentVirtualPrice - lastStoredGaugeBalance * lastStoredVirtualPrice) /
-            vars.currentVirtualPrice;
-
         if (_feePct > 0) {
+            vars.lpValueDelta =
+                (vars.currentGaugeBalance * vars.currentVirtualPrice -
+                    lastStoredGaugeBalance * lastStoredVirtualPrice) / vars.currentVirtualPrice;
+
             vars.gaugeTokensToTreausury = vars.lpValueDelta.mulDiv(_feePct, MAX_BPS);
             if (vars.gaugeTokensToTreausury > 0) {
                 IERC20(vars.gaugeCached).safeTransfer(_treasury, vars.gaugeTokensToTreausury);
