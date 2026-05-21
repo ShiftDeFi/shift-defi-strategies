@@ -11,4 +11,6 @@ interface ICurveStableSwapNG {
     function add_liquidity(uint256[] memory, uint256) external;
 
     function remove_liquidity(uint256, uint256[] memory) external;
+
+    function get_virtual_price() external view returns (uint256);
 }
