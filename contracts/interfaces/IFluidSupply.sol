@@ -6,26 +6,15 @@ interface IFluidSupply {
         address fToken;
         address underlyingAsset;
         uint256 lastFTokenBalance;
-        uint256 underlyingAssetBalance;
-        uint256 incomeInAsset;
+        uint256 fTokenBalanceAfter;
+        uint256 underlyingAssetDelta;
+        uint256 fTokenDelta;
         uint256 feeToTreasury;
-    }
-
-    struct ClaimAndReinvestLocalVariables {
-        address strategyContainer;
-        address merkleDistributor;
-        address underlyingAsset;
-        uint256 underlyingAssetBalanceBefore;
-        address rewardToken;
-        uint256 fee;
-        uint256 underlyingAssetIncome;
-        uint256 feeToTreasury;
+        address merkleRewardToken;
     }
 
     struct ClaimParams {
         uint256 cumulativeAmount;
-        uint8 positionType;
-        bytes32 positionId;
         uint256 cycle;
         bytes32[] merkleProof;
         bytes metadata;
@@ -35,8 +24,11 @@ interface IFluidSupply {
     /// @return The last recorded fToken balance
     function lastFTokenBalance() external view returns (uint256);
 
-    /// @notice Claims rewards from Fluid Merkle distributor and reinvests them
-    /// @dev Claims rewards using merkle proof, swaps to asset, takes treasury fee, and reinvests remaining amount
-    /// @param claimParams The parameters for the claim and reinvest operation
-    function claimAndReinvest(ClaimParams calldata claimParams) external;
+    /// @notice Claims rewards from Fluid Merkle distributor
+    /// @param claimParams The parameters for the claim operation
+    function manualClaim(ClaimParams calldata claimParams) external;
+
+    /// @notice Gets the address of the Merkle reward token
+    /// @return The address of the Merkle reward token
+    function merkleRewardToken() external view returns (address);
 }

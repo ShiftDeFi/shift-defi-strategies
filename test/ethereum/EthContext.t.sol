@@ -45,6 +45,8 @@ contract EthContext is BaseConfig {
 
     // Fluid addresses
     address internal constant F_USDC = 0x9Fb7b4477576Fe5B32be4C1843aFB1e55F251B33;
+    address internal constant F_USDT = 0x5C20B550819128074FD538Edf79791733ccEdd18;
+
     address internal constant MERKLE_DISTRIBUTOR = 0x7060FE0Dd3E31be01EFAc6B28C8D38018fD163B0;
 
     function setUp() public virtual override {
