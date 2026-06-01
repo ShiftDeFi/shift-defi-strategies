@@ -27,6 +27,9 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
     /// @notice Role for the Merkle claimer
     bytes32 private constant MERKLE_CLAIMER_ROLE = keccak256("MERKLE_CLAIMER_ROLE");
 
+    /// @notice Position type for lending positions of Fluid merkle rewards
+    uint8 private constant POSITION_TYPE_LENDING = 1;
+
     /// @notice The Fluid fToken address
     address public fToken;
 
@@ -129,7 +132,7 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
         IFluidMerkleDistributor(merkleDistributor).claim(
             address(this),
             claimParams.cumulativeAmount,
-            1,
+            POSITION_TYPE_LENDING,
             bytes32(uint256(uint160(fToken))),
             claimParams.cycle,
             claimParams.merkleProof,
