@@ -224,7 +224,9 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
         if (_feePct > 0 && vars.underlyingAssetDelta > 0) {
             vars.fTokenDelta = IFluidToken(vars.fToken).convertToShares(vars.underlyingAssetDelta);
             vars.feeToTreasury = vars.fTokenDelta.mulDiv(_feePct, MAX_BPS);
-            IERC20(vars.fToken).safeTransfer(_treasury, vars.feeToTreasury);
+            if (vars.feeToTreasury > 0) {
+                IERC20(vars.fToken).safeTransfer(_treasury, vars.feeToTreasury);
+            }
         }
     }
 }
