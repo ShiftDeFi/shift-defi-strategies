@@ -53,6 +53,16 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
         _disableInitializers();
     }
 
+    /// @notice Initializes the MorphoVaultStrategy contract
+    /// @dev Sets up the Morpho vault, underlying asset, reward tokens, and configures the strategy states
+    /// @param strategyContainer The address of the strategy container contract
+    /// @param defaultAdmin The address of the default admin
+    /// @param merkleClaimer The address of the Merkle claimer
+    /// @param _morphoVault The address of the Morpho vault
+    /// @param _merkleDistributor The address of the Merkle distributor
+    /// @param _rewardTokens The addresses of the reward tokens
+    /// @param slippageParams The slippage parameters
+
     function initialize(
         address strategyContainer,
         address defaultAdmin,
