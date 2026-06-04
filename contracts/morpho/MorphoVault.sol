@@ -225,11 +225,11 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             vars.vaultTokensToTreasury = vars.accruedVaultTokens.mulDiv(_feePct, MAX_BPS);
         }
 
-        for (uint256 i = 0; i < vars.rewardTokensLength; i++) {
-            _swapToInputTokens(rewardTokens[i], vars.underlyingAssetCached, 0, false);
-        }
-
         if (_stateId == MORPHO_VAULT_STATE_ID) {
+            for (uint256 i = 0; i < vars.rewardTokensLength; i++) {
+                _swapToInputTokens(rewardTokens[i], vars.underlyingAssetCached, 0, false);
+            }
+
             vars.lpAmountBefore = IERC4626(vars.morphoVaultCached).balanceOf(address(this));
             _enterMorphoVault();
             vars.reinvestLpDelta = IERC4626(vars.morphoVaultCached).balanceOf(address(this)) - vars.lpAmountBefore;
@@ -244,10 +244,11 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
         if (vars.vaultTokensToTreasury > 0) {
             IERC20(vars.morphoVaultCached).safeTransfer(_treasury, vars.vaultTokensToTreasury);
-            lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
-                IERC4626(vars.morphoVaultCached).balanceOf(address(this))
-            );
         }
+
+        lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
+            IERC4626(vars.morphoVaultCached).balanceOf(address(this))
+        );
     }
 
     /// @inheritdoc IMorphoVault
