@@ -36,8 +36,8 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
     /// @notice The underlying asset address
     address public underlyingAsset;
 
-    /// @notice The last recorded deposit balance in asset terms, used for harvest calculations
-    uint256 public lastFTokenBalance;
+    /// @notice The last recorded value of vault token amount * share price
+    uint256 public lastAssetsValue;
 
     /// @notice The address of the Fluid Merkle distributor contract
     address public merkleDistributor;
@@ -183,7 +183,7 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
 
         IERC20(underlyingAssetCached).safeIncreaseAllowance(fTokenCached, underlyingAssetBalance);
         IFluidToken(fTokenCached).deposit(underlyingAssetBalance, address(this));
-        lastFTokenBalance = IERC20(fTokenCached).balanceOf(address(this));
+        lastAssetsValue = IFluidToken(fTokenCached).convertToAssets(IERC20(fTokenCached).balanceOf(address(this)));
     }
 
     function _exitFluid(uint256 share) internal {
@@ -199,34 +199,47 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
 
         IERC20(fTokenCached).safeIncreaseAllowance(fTokenCached, fTokenAmountToRedeem);
         IFluidToken(fTokenCached).redeem(fTokenAmountToRedeem, address(this), address(this));
-        lastFTokenBalance = IERC20(fTokenCached).balanceOf(address(this));
+        lastAssetsValue = IFluidToken(fTokenCached).convertToAssets(IERC20(fTokenCached).balanceOf(address(this)));
     }
 
-    function _harvest(bytes32, address _treasury, uint256 _feePct) internal override {
-        HarvestLocalVariables memory vars;
-        vars.fToken = fToken;
-        vars.lastFTokenBalance = lastFTokenBalance;
-
+    function _harvest(bytes32 _stateId, address _treasury, uint256 _feePct) internal override {
+        AutomaticHarvestLocalVars memory vars;
+        vars.fTokenCached = fToken;
+        vars.lastAssetsValue = lastAssetsValue;
         vars.merkleRewardToken = merkleRewardToken;
 
-        if (IERC20(vars.merkleRewardToken).balanceOf(address(this)) > 0) {
-            _swapToInputTokens(vars.merkleRewardToken, underlyingAsset, 0, false);
-            _enterFluid();
+        vars.accruedAssetsValue =
+            IFluidToken(vars.fTokenCached).convertToAssets(IERC20(vars.fTokenCached).balanceOf(address(this))) -
+            vars.lastAssetsValue;
+
+        if (vars.accruedAssetsValue > 0) {
+            vars.accruedFTokenAmount = IFluidToken(vars.fTokenCached).convertToShares(vars.accruedAssetsValue);
+            vars.fTokensToTreasury = vars.accruedFTokenAmount.mulDiv(_feePct, MAX_BPS);
         }
 
-        vars.fTokenBalanceAfter = IERC20(vars.fToken).balanceOf(address(this));
-        lastFTokenBalance = vars.fTokenBalanceAfter;
+        if (_stateId == FLUID_SUPPLY_STATE_ID) {
+            if (IERC20(vars.merkleRewardToken).balanceOf(address(this)) > 0) {
+                vars.fTokensAmountBefore = IERC20(vars.fTokenCached).balanceOf(address(this));
+                _swapToInputTokens(vars.merkleRewardToken, underlyingAsset, 0, false);
+                _enterFluid();
+                vars.reinvestFTokenDelta =
+                    IERC20(vars.fTokenCached).balanceOf(address(this)) - vars.fTokensAmountBefore;
 
-        vars.underlyingAssetDelta =
-            IFluidToken(vars.fToken).convertToAssets(vars.fTokenBalanceAfter) -
-            IFluidToken(vars.fToken).convertToAssets(vars.lastFTokenBalance);
-
-        if (_feePct > 0 && vars.underlyingAssetDelta > 0) {
-            vars.fTokenDelta = IFluidToken(vars.fToken).convertToShares(vars.underlyingAssetDelta);
-            vars.feeToTreasury = vars.fTokenDelta.mulDiv(_feePct, MAX_BPS);
-            if (vars.feeToTreasury > 0) {
-                IERC20(vars.fToken).safeTransfer(_treasury, vars.feeToTreasury);
+                if (vars.reinvestFTokenDelta > 0) {
+                    vars.feeFromReinvest = vars.reinvestFTokenDelta.mulDiv(_feePct, MAX_BPS);
+                    if (vars.feeFromReinvest > 0) {
+                        vars.fTokensToTreasury += vars.feeFromReinvest;
+                    }
+                }
             }
         }
+
+        if (vars.fTokensToTreasury > 0) {
+            IERC20(vars.fTokenCached).safeTransfer(_treasury, vars.fTokensToTreasury);
+        }
+
+        lastAssetsValue = IFluidToken(vars.fTokenCached).convertToAssets(
+            IERC20(vars.fTokenCached).balanceOf(address(this))
+        );
     }
 }

@@ -11,7 +11,7 @@ import {Common} from "@shift-defi/core/libraries/Common.sol";
 
 import {FluidSupply} from "contracts/fluid/FluidSupply.sol";
 import {IFluidToken} from "contracts/dependencies/fluid/IFluidToken.sol";
-import {IFluidSupply} from "contracts/interfaces/IFluidSupply.sol";
+import {IFluidMerkleDistributor} from "contracts/dependencies/fluid/IFluidMerkleDistributor.sol";
 
 import {EthContext} from "test/ethereum/EthContext.t.sol";
 
@@ -22,6 +22,7 @@ abstract contract FluidSupplyBase is EthContext {
     IStrategyTemplate internal fluidSupply;
     address internal fToken;
     address internal underlyingAsset;
+    address internal merkleRewardToken;
 
     uint256 internal constant ENTER_AMOUNT = 100_000;
     uint256 internal constant NAV_TOLERANCE_PCT = 2e14; // 0.02%
@@ -45,7 +46,7 @@ abstract contract FluidSupplyBase is EthContext {
         super.setUp();
 
         underlyingAsset = IFluidToken(fToken).asset();
-
+        merkleRewardToken = IFluidMerkleDistributor(MERKLE_DISTRIBUTOR).TOKEN();
         address implementation = address(new FluidSupply());
         fluidSupply = IStrategyTemplate(
             _proxify(
@@ -104,9 +105,9 @@ abstract contract FluidSupplyBase is EthContext {
         _enterStrategy();
 
         deal(
-            IFluidSupply(address(fluidSupply)).merkleRewardToken(),
+            merkleRewardToken,
             address(fluidSupply),
-            1000 * 10 ** uint256(IERC20Metadata(IFluidSupply(address(fluidSupply)).merkleRewardToken()).decimals()),
+            1000 * 10 ** uint256(IERC20Metadata(merkleRewardToken).decimals()),
             true
         );
 

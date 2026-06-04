@@ -2,15 +2,16 @@
 pragma solidity ^0.8.28;
 
 interface IFluidSupply {
-    struct HarvestLocalVariables {
-        address fToken;
-        address underlyingAsset;
-        uint256 lastFTokenBalance;
-        uint256 fTokenBalanceAfter;
-        uint256 underlyingAssetDelta;
-        uint256 fTokenDelta;
-        uint256 feeToTreasury;
+    struct AutomaticHarvestLocalVars {
+        address fTokenCached;
         address merkleRewardToken;
+        uint256 lastAssetsValue;
+        uint256 accruedAssetsValue;
+        uint256 accruedFTokenAmount;
+        uint256 fTokensToTreasury;
+        uint256 fTokensAmountBefore;
+        uint256 reinvestFTokenDelta;
+        uint256 feeFromReinvest;
     }
 
     struct ClaimParams {
@@ -20,15 +21,7 @@ interface IFluidSupply {
         bytes metadata;
     }
 
-    /// @notice Gets the last recorded fToken balance
-    /// @return The last recorded fToken balance
-    function lastFTokenBalance() external view returns (uint256);
-
     /// @notice Claims rewards from Fluid Merkle distributor
     /// @param claimParams The parameters for the claim operation
     function manualClaim(ClaimParams calldata claimParams) external;
-
-    /// @notice Gets the address of the Merkle reward token
-    /// @return The address of the Merkle reward token
-    function merkleRewardToken() external view returns (address);
 }
