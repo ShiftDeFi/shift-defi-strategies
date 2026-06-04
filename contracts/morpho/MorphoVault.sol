@@ -255,7 +255,9 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
         address[] calldata tokens,
         uint256[] calldata amounts,
         bytes32[][] calldata proofs
-    ) external onlyRole(MERKLE_CLAIMER_ROLE) {
+    ) external nonReentrant onlyRole(MERKLE_CLAIMER_ROLE) {
+        require(!isNavResolutionMode(), NavResolutionModeActivated());
+
         ManualClaimLocalVars memory vars;
 
         vars.morphoVaultCached = morphoVault;
