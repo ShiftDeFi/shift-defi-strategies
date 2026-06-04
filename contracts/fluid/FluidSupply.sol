@@ -128,7 +128,7 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
     }
 
     /// @inheritdoc IFluidSupply
-    function manualClaim(ClaimParams calldata claimParams) external onlyRole(MERKLE_CLAIMER_ROLE) {
+    function manualClaim(ClaimParams calldata claimParams) external nonReentrant onlyRole(MERKLE_CLAIMER_ROLE) {
         IFluidMerkleDistributor(merkleDistributor).claim(
             address(this),
             claimParams.cumulativeAmount,
