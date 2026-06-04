@@ -298,9 +298,10 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
         if (vars.vaultTokensToTreasury > 0) {
             IERC20(vars.morphoVaultCached).safeTransfer(vars.treasury, vars.vaultTokensToTreasury);
-            lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
-                IERC4626(vars.morphoVaultCached).balanceOf(address(this))
-            );
         }
+
+        lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
+            IERC4626(vars.morphoVaultCached).balanceOf(address(this))
+        );
     }
 }
