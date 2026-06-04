@@ -252,7 +252,6 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
     /// @inheritdoc IMorphoVault
     function manualClaim(
-        address[] calldata users,
         address[] calldata tokens,
         uint256[] calldata amounts,
         bytes32[][] calldata proofs
@@ -276,7 +275,10 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
         vars.lpAmountBefore = IERC4626(vars.morphoVaultCached).balanceOf(address(this));
 
-        IAngleMerkleDistributor(merkleDistributor).claim(users, tokens, amounts, proofs);
+        vars.users = new address[](1);
+        vars.users[0] = address(this);
+
+        IAngleMerkleDistributor(merkleDistributor).claim(vars.users, tokens, amounts, proofs);
 
         for (uint256 i = 0; i < vars.rewardTokensLength; i++) {
             if (tokens[i] == vars.underlyingAssetCached) {

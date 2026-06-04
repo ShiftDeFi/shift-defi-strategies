@@ -27,6 +27,7 @@ interface IMorphoVault {
         uint256 accruedVaultTokens;
         uint256 vaultTokensToTreasury;
         uint256 lpAmountBefore;
+        address[] users;
         uint256 reinvestLpDelta;
         uint256 feeFromReinvest;
     }
@@ -48,14 +49,8 @@ interface IMorphoVault {
     /// @notice Manually claims the rewards. Only callable by role MERKLE_CLAIMER_ROLE
     /// @dev Underlying asset claimed via manual claim is instantly reinvested,
     ///      other reward tokens are reinvested during standard harvest
-    /// @param users The addresses of the users
     /// @param tokens The addresses of the tokens
     /// @param amounts The amounts of the tokens
     /// @param proofs The proofs of the merkle proofs
-    function manualClaim(
-        address[] calldata users,
-        address[] calldata tokens,
-        uint256[] calldata amounts,
-        bytes32[][] calldata proofs
-    ) external;
+    function manualClaim(address[] calldata tokens, uint256[] calldata amounts, bytes32[][] calldata proofs) external;
 }
