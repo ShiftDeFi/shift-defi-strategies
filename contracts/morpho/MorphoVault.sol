@@ -183,12 +183,12 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
         address morphoVaultCached = morphoVault;
 
         uint256 lpAmount = IERC4626(morphoVaultCached).balanceOf(address(this));
+        uint256 lpToWithdraw = lpAmount.mulDiv(share, MAX_BPS);
 
-        if (lpAmount == 0) {
+        if (lpToWithdraw == 0) {
             return;
         }
 
-        uint256 lpToWithdraw = lpAmount.mulDiv(share, MAX_BPS);
         IERC4626(morphoVaultCached).redeem(lpToWithdraw, address(this), address(this));
 
         lastAssetsValue = IERC4626(morphoVaultCached).convertToAssets(
