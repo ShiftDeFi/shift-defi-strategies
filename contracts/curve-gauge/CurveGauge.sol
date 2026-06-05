@@ -120,8 +120,12 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
             return;
         }
 
-        IERC20(underlyingAsset0).safeIncreaseAllowance(lpToken, amounts[0]);
-        IERC20(underlyingAsset1).safeIncreaseAllowance(lpToken, amounts[1]);
+        if (amounts[0] > 0) {
+            IERC20(underlyingAsset0).safeIncreaseAllowance(lpToken, amounts[0]);
+        }
+        if (amounts[1] > 0) {
+            IERC20(underlyingAsset1).safeIncreaseAllowance(lpToken, amounts[1]);
+        }
 
         ICurveStableSwapNG(lpToken).add_liquidity(amounts, 0);
     }
