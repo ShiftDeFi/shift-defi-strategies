@@ -52,6 +52,8 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         _setState(UNDERLYING_ASSETS_STATE_ID, false, false, true, 1);
         _setState(CURVE_LP_STATE_ID, false, true, false, 2);
         _setState(CURVE_GAUGE_STATE_ID, true, true, false, 3);
+
+        lastStoredVirtualPrice = ICurveStableSwapNG(lpToken).get_virtual_price();
     }
 
     /// @inheritdoc IStrategyTemplate
