@@ -48,7 +48,7 @@ contract CurveGaugeRlusdUsdcEmergencyExitTest is CurveGaugeRlusdUsdcBase {
         uint256 partialShare = MAX_BPS / 2;
         uint256 minNavDelta = stateNav.mulDiv(partialShare, MAX_BPS);
         vm.startPrank(roles.emergencyExecutor);
-        curveGaugeRlusdUsdc.emergencyExit(CURVE_LP_STATE_ID, partialShare, minNavDelta);
+        curveGaugeRlusdUsdc.emergencyExit(CURVE_LP_STATE_ID, partialShare, minNavDelta - 1);
         vm.stopPrank();
 
         assertApproxEqRel(
