@@ -80,6 +80,10 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         uint256 lpBalance = IERC20(lpTokenCached).balanceOf(address(this));
         uint256 totalSupply = ICurveStableSwapNG(lpTokenCached).totalSupply();
 
+        if (lpBalance == 0 || totalSupply == 0) {
+            return 0;
+        }
+
         uint256[] memory poolReserves = ICurveStableSwapNG(lpTokenCached).get_balances();
         uint256 totalPoolNav = getTokenAmountInNotion(underlyingAsset0, poolReserves[0]) +
             getTokenAmountInNotion(underlyingAsset1, poolReserves[1]);
@@ -93,6 +97,10 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
 
         address lpTokenCached = lpToken;
         uint256 totalSupply = ICurveStableSwapNG(lpTokenCached).totalSupply();
+
+        if (stakedLp == 0 || totalSupply == 0) {
+            return 0;
+        }
 
         uint256[] memory poolReserves = ICurveStableSwapNG(lpTokenCached).get_balances();
         uint256 totalPoolNav = getTokenAmountInNotion(underlyingAsset0, poolReserves[0]) +
