@@ -80,9 +80,9 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
     function _curveLpNav() internal view returns (uint256) {
         address lpTokenCached = lpToken;
         uint256 lpBalance = IERC20(lpTokenCached).balanceOf(address(this));
-        uint256 totalSupply = ICurveStableSwapNG(lpTokenCached).totalSupply();
+        uint256 totalSupply = IERC20(lpTokenCached).totalSupply();
 
-        if (lpBalance == 0 || totalSupply == 0) {
+        if (totalSupply == 0) {
             return 0;
         }
 
@@ -98,7 +98,7 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         uint256 stakedLp = ILiquidityGaugeV6(gaugeCached).balanceOf(address(this));
 
         address lpTokenCached = lpToken;
-        uint256 totalSupply = ICurveStableSwapNG(lpTokenCached).totalSupply();
+        uint256 totalSupply = IERC20(lpTokenCached).totalSupply();
 
         if (stakedLp == 0 || totalSupply == 0) {
             return 0;
