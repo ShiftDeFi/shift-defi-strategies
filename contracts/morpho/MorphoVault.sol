@@ -206,9 +206,16 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
     function _calculateAccruedAssetsValue() private view returns (uint256) {
         address morphoVaultCached = morphoVault;
-        return
-            IERC4626(morphoVaultCached).convertToAssets(IERC4626(morphoVaultCached).balanceOf(address(this))) -
-            lastAssetsValue;
+        uint256 currentAssetsValue = IERC4626(morphoVaultCached).convertToAssets(
+            IERC4626(morphoVaultCached).balanceOf(address(this))
+        );
+        uint256 lastAssetsValueCached = lastAssetsValue;
+
+        if (currentAssetsValue > lastAssetsValueCached) {
+            return currentAssetsValue - lastAssetsValueCached;
+        }
+
+        return 0;
     }
 
     function _harvest(bytes32 _stateId, address _treasury, uint256 _feePct) internal override {
