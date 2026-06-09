@@ -52,6 +52,8 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         _setState(UNDERLYING_ASSETS_STATE_ID, false, false, true, 1);
         _setState(CURVE_LP_STATE_ID, false, true, false, 2);
         _setState(CURVE_GAUGE_STATE_ID, true, true, false, 3);
+
+        lastStoredVirtualPrice = ICurveStableSwapNG(lpToken).get_virtual_price();
     }
 
     /// @inheritdoc IStrategyTemplate
@@ -78,7 +80,11 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
     function _curveLpNav() internal view returns (uint256) {
         address lpTokenCached = lpToken;
         uint256 lpBalance = IERC20(lpTokenCached).balanceOf(address(this));
-        uint256 totalSupply = ICurveStableSwapNG(lpTokenCached).totalSupply();
+        uint256 totalSupply = IERC20(lpTokenCached).totalSupply();
+
+        if (totalSupply == 0) {
+            return 0;
+        }
 
         uint256[] memory poolReserves = ICurveStableSwapNG(lpTokenCached).get_balances();
         uint256 totalPoolNav = getTokenAmountInNotion(underlyingAsset0, poolReserves[0]) +
@@ -92,7 +98,11 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         uint256 stakedLp = ILiquidityGaugeV6(gaugeCached).balanceOf(address(this));
 
         address lpTokenCached = lpToken;
-        uint256 totalSupply = ICurveStableSwapNG(lpTokenCached).totalSupply();
+        uint256 totalSupply = IERC20(lpTokenCached).totalSupply();
+
+        if (stakedLp == 0 || totalSupply == 0) {
+            return 0;
+        }
 
         uint256[] memory poolReserves = ICurveStableSwapNG(lpTokenCached).get_balances();
         uint256 totalPoolNav = getTokenAmountInNotion(underlyingAsset0, poolReserves[0]) +
@@ -110,8 +120,12 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
             return;
         }
 
-        IERC20(underlyingAsset0).safeIncreaseAllowance(lpToken, amounts[0]);
-        IERC20(underlyingAsset1).safeIncreaseAllowance(lpToken, amounts[1]);
+        if (amounts[0] > 0) {
+            IERC20(underlyingAsset0).safeIncreaseAllowance(lpToken, amounts[0]);
+        }
+        if (amounts[1] > 0) {
+            IERC20(underlyingAsset1).safeIncreaseAllowance(lpToken, amounts[1]);
+        }
 
         ICurveStableSwapNG(lpToken).add_liquidity(amounts, 0);
     }
@@ -210,28 +224,23 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
     }
 
     function _harvest(bytes32 _stateId, address _treasury, uint256 _feePct) internal override {
-        if (_stateId != CURVE_GAUGE_STATE_ID) {
-            return;
-        }
-
-        HarvestLocalVariables memory vars;
+        AutomaticHarvestLocalVars memory vars;
         vars.gaugeCached = gauge;
         vars.lpTokenCached = lpToken;
         vars.asset0Cached = underlyingAsset0;
         vars.asset1Cached = underlyingAsset1;
 
+        vars.lastStoredVirtualPrice = lastStoredVirtualPrice;
+
         vars.currentGaugeBalance = ILiquidityGaugeV6(vars.gaugeCached).balanceOf(address(this));
         vars.currentVirtualPrice = ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price();
 
-        if (_feePct > 0) {
-            vars.lpValueDelta =
+        if (_feePct > 0 && vars.currentVirtualPrice > vars.lastStoredVirtualPrice) {
+            vars.accruedLpValue =
                 (vars.currentGaugeBalance * vars.currentVirtualPrice -
-                    lastStoredGaugeBalance * lastStoredVirtualPrice) / vars.currentVirtualPrice;
+                    lastStoredGaugeBalance * vars.lastStoredVirtualPrice) / vars.currentVirtualPrice;
 
-            vars.gaugeTokensToTreausury = vars.lpValueDelta.mulDiv(_feePct, MAX_BPS);
-            if (vars.gaugeTokensToTreausury > 0) {
-                IERC20(vars.gaugeCached).safeTransfer(_treasury, vars.gaugeTokensToTreausury);
-            }
+            vars.gaugeTokensToTreasury = vars.accruedLpValue.mulDiv(_feePct, MAX_BPS);
         }
 
         vars.asset0BalanceBefore = IERC20(vars.asset0Cached).balanceOf(address(this));
@@ -242,26 +251,34 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         vars.asset0Rewards = IERC20(vars.asset0Cached).balanceOf(address(this)) - vars.asset0BalanceBefore;
         vars.asset1Rewards = IERC20(vars.asset1Cached).balanceOf(address(this)) - vars.asset1BalanceBefore;
 
-        if (vars.asset0Rewards == 0 && vars.asset1Rewards == 0) {
-            return;
+        if ((vars.asset0Rewards != 0 || vars.asset1Rewards != 0) && _stateId == CURVE_GAUGE_STATE_ID) {
+            uint256[] memory amounts = new uint256[](2);
+            amounts[0] = vars.asset0Rewards;
+            amounts[1] = vars.asset1Rewards;
+
+            IERC20(vars.asset0Cached).safeIncreaseAllowance(vars.lpTokenCached, amounts[0]);
+            IERC20(vars.asset1Cached).safeIncreaseAllowance(vars.lpTokenCached, amounts[1]);
+
+            ICurveStableSwapNG(vars.lpTokenCached).add_liquidity(amounts, 0);
+
+            _enterCurveGauge();
+
+            vars.reinvestGaugeDelta =
+                ILiquidityGaugeV6(vars.gaugeCached).balanceOf(address(this)) - vars.currentGaugeBalance;
+
+            if (vars.reinvestGaugeDelta > 0) {
+                vars.feeFromReinvest = vars.reinvestGaugeDelta.mulDiv(_feePct, MAX_BPS);
+                if (vars.feeFromReinvest > 0) {
+                    vars.gaugeTokensToTreasury += vars.feeFromReinvest;
+                }
+            }
         }
 
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = vars.asset0Rewards;
-        amounts[1] = vars.asset1Rewards;
-
-        IERC20(vars.asset0Cached).safeIncreaseAllowance(vars.lpTokenCached, amounts[0]);
-        IERC20(vars.asset1Cached).safeIncreaseAllowance(vars.lpTokenCached, amounts[1]);
-
-        ICurveStableSwapNG(vars.lpTokenCached).add_liquidity(amounts, 0);
-
-        vars.gaugeTokenBalanceBefore = IERC20(vars.gaugeCached).balanceOf(address(this));
-        _enterCurveGauge();
-        vars.gaugeTokensHarvested = IERC20(vars.gaugeCached).balanceOf(address(this)) - vars.gaugeTokenBalanceBefore;
-
-        if (_feePct > 0) {
-            uint256 gaugeTokensToTreasury = vars.gaugeTokensHarvested.mulDiv(_feePct, MAX_BPS);
-            IERC20(vars.gaugeCached).safeTransfer(_treasury, gaugeTokensToTreasury);
+        if (vars.gaugeTokensToTreasury > 0) {
+            IERC20(vars.gaugeCached).safeTransfer(_treasury, vars.gaugeTokensToTreasury);
         }
+
+        lastStoredGaugeBalance = ILiquidityGaugeV6(vars.gaugeCached).balanceOf(address(this));
+        lastStoredVirtualPrice = ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price();
     }
 }
