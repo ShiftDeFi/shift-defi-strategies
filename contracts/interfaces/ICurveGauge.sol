@@ -2,21 +2,22 @@
 pragma solidity ^0.8.28;
 
 interface ICurveGauge {
-    struct HarvestLocalVariables {
+    struct AutomaticHarvestLocalVars {
         address gaugeCached;
         address lpTokenCached;
         address asset0Cached;
         address asset1Cached;
+        uint256 lastStoredVirtualPrice;
         uint256 currentGaugeBalance;
         uint256 currentVirtualPrice;
-        uint256 lpValueDelta;
-        uint256 gaugeTokensToTreausury;
+        uint256 accruedLpValue;
+        uint256 gaugeTokensToTreasury;
         uint256 asset0BalanceBefore;
         uint256 asset1BalanceBefore;
         uint256 asset0Rewards;
         uint256 asset1Rewards;
-        uint256 gaugeTokenBalanceBefore;
-        uint256 gaugeTokensHarvested;
+        uint256 reinvestGaugeDelta;
+        uint256 feeFromReinvest;
     }
 
     function gauge() external view returns (address);
