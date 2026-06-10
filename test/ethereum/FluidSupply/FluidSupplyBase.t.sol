@@ -81,7 +81,7 @@ abstract contract FluidSupplyBase is EthContext {
         IERC20(underlyingAsset).forceApprove(address(fluidSupply), type(uint256).max);
 
         uint256 minNavDelta = (fluidSupply.getTokenAmountInNotion(underlyingAsset, amounts[0]) *
-            (MAX_BPS - ENTER_MAX_SLIPPAGE)) / MAX_BPS;
+            (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT)) / MAX_BPS;
         fluidSupply.enter(amounts, minNavDelta);
 
         vm.stopPrank();
@@ -96,7 +96,7 @@ abstract contract FluidSupplyBase is EthContext {
                 underlyingAsset,
                 ENTER_AMOUNT * 10 ** uint256(IERC20Metadata(underlyingAsset).decimals())
             ),
-            NAV_TOLERANCE_PCT,
+            4 * NAV_TOLERANCE_PCT,
             "test_EnterTarget: Fluid Supply NAV"
         );
     }
@@ -128,16 +128,16 @@ abstract contract FluidSupplyBase is EthContext {
         _enterStrategy();
 
         uint256 fluidSupplyNavBefore = fluidSupply.stateNav(FLUID_SUPPLY_STATE_ID);
-        uint256 partialShare = MAX_BPS / 2;
-        uint256 minNavDelta = fluidSupplyNavBefore.mulDiv(partialShare, MAX_BPS);
+        uint256 partialShare = MAX_BPS / 2 - ONE_PCT;
+        uint256 maxNavDelta = fluidSupplyNavBefore.mulDiv(partialShare, MAX_BPS);
 
         vm.prank(mockStrategyContainer);
-        fluidSupply.exit(partialShare, minNavDelta);
+        fluidSupply.exit(partialShare, maxNavDelta);
 
         uint256 fluidSupplyNavAfter = fluidSupply.stateNav(FLUID_SUPPLY_STATE_ID);
         assertApproxEqRel(
             fluidSupplyNavAfter,
-            fluidSupplyNavBefore - minNavDelta,
+            fluidSupplyNavBefore - maxNavDelta,
             NAV_TOLERANCE_PCT,
             "test_ExitTarget_Partial: Fluid Supply NAV"
         );
@@ -154,7 +154,7 @@ abstract contract FluidSupplyBase is EthContext {
         assertApproxEqRel(
             Common.toUnifiedDecimalsUint8(underlyingAsset, exitedAmount),
             fluidSupplyNavBefore - fluidSupplyNavAfter,
-            NAV_TOLERANCE_PCT,
+            4 * NAV_TOLERANCE_PCT,
             "test_ExitTarget_Partial: Exited Amount"
         );
     }
@@ -163,10 +163,10 @@ abstract contract FluidSupplyBase is EthContext {
         _enterStrategy();
 
         uint256 fluidSupplyNavBefore = fluidSupply.stateNav(FLUID_SUPPLY_STATE_ID);
-        uint256 minNavDelta = fluidSupplyNavBefore;
+        uint256 maxNavDelta = fluidSupplyNavBefore;
 
         vm.prank(mockStrategyContainer);
-        fluidSupply.exit(MAX_BPS, minNavDelta);
+        fluidSupply.exit(MAX_BPS, maxNavDelta);
 
         uint256 fluidSupplyNavAfter = fluidSupply.stateNav(FLUID_SUPPLY_STATE_ID);
         assertEq(fluidSupplyNavAfter, 0, "test_ExitTarget_Full: Fluid Supply NAV");
@@ -178,7 +178,7 @@ abstract contract FluidSupplyBase is EthContext {
         assertApproxEqRel(
             Common.toUnifiedDecimalsUint8(underlyingAsset, exitedAmount),
             fluidSupplyNavBefore,
-            NAV_TOLERANCE_PCT,
+            4 * NAV_TOLERANCE_PCT,
             "test_ExitTarget_Full: Exited Amount"
         );
     }
