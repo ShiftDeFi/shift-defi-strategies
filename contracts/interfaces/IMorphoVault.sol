@@ -42,6 +42,10 @@ interface IMorphoVault {
 
     // ---- Functions ----
 
+    /// @notice Returns the reward tokens
+    /// @return The addresses of the reward tokens
+    function getRewardTokens() external view returns (address[] memory);
+
     /// @notice Sets the reward tokens. Only callabe by role HARVEST_MANAGER_ROLE
     /// @param _rewardTokens The addresses of the reward tokens
     function setRewardTokens(address[] memory _rewardTokens) external;

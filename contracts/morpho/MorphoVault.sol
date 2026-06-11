@@ -38,7 +38,7 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
     address public merkleDistributor;
 
     /// @notice The addresses of the reward tokens
-    address[] public rewardTokens;
+    address[] internal rewardTokens;
 
     /// @notice The last recorded value of vault token amount * share price
     uint256 public lastAssetsValue;
@@ -97,6 +97,11 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
         _setState(UNDERLYING_ASSET_STATE_ID, false, false, true, 0);
         _setState(MORPHO_VAULT_STATE_ID, true, true, false, 1);
+    }
+
+    /// @inheritdoc IMorphoVault
+    function getRewardTokens() external view override returns (address[] memory) {
+        return rewardTokens;
     }
 
     /// @inheritdoc IMorphoVault
