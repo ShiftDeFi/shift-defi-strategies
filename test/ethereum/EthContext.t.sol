@@ -40,14 +40,16 @@ contract EthContext is BaseConfig {
 
     address internal constant CURVE_GAUGE_PYUSD_USDC = 0x9da75997624C697444958aDeD6790bfCa96Af19A;
     address internal constant CURVE_GAUGE_RLUSD_USDC = 0xFc3212Bd9Ad9A28Da6B2bd50a2918969C126894F;
-    // Morpho addresses
-    address internal constant MORPHO_SENTORA_PYUSD = 0xb576765fB15505433aF24FEe2c0325895C559FB2;
 
     // Fluid addresses
     address internal constant F_USDC = 0x9Fb7b4477576Fe5B32be4C1843aFB1e55F251B33;
     address internal constant F_USDT = 0x5C20B550819128074FD538Edf79791733ccEdd18;
+    address internal constant FLUID_MERKLE_DISTRIBUTOR = 0x7060FE0Dd3E31be01EFAc6B28C8D38018fD163B0;
 
-    address internal constant MERKLE_DISTRIBUTOR = 0x7060FE0Dd3E31be01EFAc6B28C8D38018fD163B0;
+    // Morpho addresses
+    address internal constant MORPHO_SENTORA_PYUSD = 0xb576765fB15505433aF24FEe2c0325895C559FB2;
+    address internal constant MORPHO_SENTORA_RLUSD = 0x6dC58a0FdfC8D694e571DC59B9A52EEEa780E6bf;
+    address internal constant MORPHO_MERKLE_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
 
     function setUp() public virtual override {
         super.setUp();
