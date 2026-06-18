@@ -9,6 +9,7 @@ interface IFluidMerkleDistributor {
     /// @param positionId_ - id of the position, fToken address for lending and vaultId for vaults
     /// @param cycle_ - cycle of the rewards
     /// @param merkleProof_ - merkle proof of the rewards
+    /// @param metadata_ - metadata of the rewards
     function claim(
         address recipient_,
         uint256 cumulativeAmount_,
@@ -16,8 +17,10 @@ interface IFluidMerkleDistributor {
         bytes32 positionId_,
         uint256 cycle_,
         bytes32[] calldata merkleProof_,
-        bytes memory metadata_
+        bytes calldata metadata_
     ) external;
 
+    /// @notice Gets the address of the reward token
+    /// @return The address of the reward token
     function TOKEN() external view returns (address);
 }
