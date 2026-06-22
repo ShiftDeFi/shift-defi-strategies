@@ -286,6 +286,9 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         }
 
         lastStoredGaugeBalance = ILiquidityGaugeV6(vars.gaugeCached).balanceOf(address(this));
-        lastStoredVirtualPrice = ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price();
+        lastStoredVirtualPrice = Math.max(
+            ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price(),
+            vars.lastStoredVirtualPrice
+        );
     }
 }
