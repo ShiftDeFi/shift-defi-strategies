@@ -230,15 +230,22 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         vars.asset0Cached = underlyingAsset0;
         vars.asset1Cached = underlyingAsset1;
 
+        vars.lastStoredGaugeBalance = lastStoredGaugeBalance;
         vars.lastStoredVirtualPrice = lastStoredVirtualPrice;
 
         vars.currentGaugeBalance = ILiquidityGaugeV6(vars.gaugeCached).balanceOf(address(this));
         vars.currentVirtualPrice = ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price();
 
+        if (vars.lastStoredGaugeBalance == 0) {
+            lastStoredGaugeBalance = vars.currentGaugeBalance;
+            lastStoredVirtualPrice = vars.currentVirtualPrice;
+            return;
+        }
+
         if (_feePct > 0 && vars.currentVirtualPrice > vars.lastStoredVirtualPrice) {
             vars.accruedLpValue =
                 (vars.currentGaugeBalance * vars.currentVirtualPrice -
-                    lastStoredGaugeBalance * vars.lastStoredVirtualPrice) / vars.currentVirtualPrice;
+                    vars.lastStoredGaugeBalance * vars.lastStoredVirtualPrice) / vars.currentVirtualPrice;
 
             vars.gaugeTokensToTreasury = vars.accruedLpValue.mulDiv(_feePct, MAX_BPS);
         }
@@ -279,6 +286,9 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
         }
 
         lastStoredGaugeBalance = ILiquidityGaugeV6(vars.gaugeCached).balanceOf(address(this));
-        lastStoredVirtualPrice = ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price();
+        lastStoredVirtualPrice = Math.max(
+            ICurveStableSwapNG(vars.lpTokenCached).get_virtual_price(),
+            vars.lastStoredVirtualPrice
+        );
     }
 }

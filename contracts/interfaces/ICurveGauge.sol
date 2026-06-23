@@ -7,6 +7,7 @@ interface ICurveGauge {
         address lpTokenCached;
         address asset0Cached;
         address asset1Cached;
+        uint256 lastStoredGaugeBalance;
         uint256 lastStoredVirtualPrice;
         uint256 currentGaugeBalance;
         uint256 currentVirtualPrice;
