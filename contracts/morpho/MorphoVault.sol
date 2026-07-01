@@ -112,10 +112,14 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
     function _setRewardTokens(address[] memory _rewardTokens) private {
         uint256 rewardTokensLength = _rewardTokens.length;
         address underlyingAssetCached = underlyingAsset;
-        for (uint256 i = 0; i < rewardTokensLength; i++) {
+        address morphoVaultCached = morphoVault;
+
+        for (uint256 i = 0; i < rewardTokensLength; ++i) {
             require(_rewardTokens[i] != address(0), Errors.ZeroAddress());
             require(_rewardTokens[i] != underlyingAssetCached, RewardTokenMatchesUnderlyingAsset());
+            require(_rewardTokens[i] != morphoVaultCached, RewardTokenMatchesMorphoVault());
         }
+
         rewardTokens = _rewardTokens;
         emit RewardTokensUpdated(_rewardTokens);
     }

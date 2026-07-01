@@ -39,6 +39,7 @@ interface IMorphoVault {
     // ---- Errors ----
 
     error RewardTokenMatchesUnderlyingAsset();
+    error RewardTokenMatchesMorphoVault();
 
     // ---- Functions ----
 
