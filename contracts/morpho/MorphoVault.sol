@@ -295,19 +295,21 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
         IAngleMerkleDistributor(merkleDistributor).claim(vars.users, tokens, amounts, proofs);
 
-        for (uint256 i = 0; i < vars.rewardTokensLength; i++) {
-            if (tokens[i] == vars.underlyingAssetCached) {
-                _enterMorphoVault();
-                break;
+        if (currentStateId() == MORPHO_VAULT_STATE_ID) {
+            for (uint256 i = 0; i < vars.rewardTokensLength; i++) {
+                if (tokens[i] == vars.underlyingAssetCached) {
+                    _enterMorphoVault();
+                    break;
+                }
             }
-        }
 
-        vars.reinvestLpDelta = IERC4626(vars.morphoVaultCached).balanceOf(address(this)) - vars.lpAmountBefore;
+            vars.reinvestLpDelta = IERC4626(vars.morphoVaultCached).balanceOf(address(this)) - vars.lpAmountBefore;
 
-        if (vars.reinvestLpDelta > 0) {
-            vars.feeFromReinvest = vars.reinvestLpDelta.mulDiv(vars.feePct, MAX_BPS);
-            if (vars.feeFromReinvest > 0) {
-                vars.vaultTokensToTreasury += vars.feeFromReinvest;
+            if (vars.reinvestLpDelta > 0) {
+                vars.feeFromReinvest = vars.reinvestLpDelta.mulDiv(vars.feePct, MAX_BPS);
+                if (vars.feeFromReinvest > 0) {
+                    vars.vaultTokensToTreasury += vars.feeFromReinvest;
+                }
             }
         }
 
