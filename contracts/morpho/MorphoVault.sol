@@ -262,9 +262,13 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             IERC20(vars.morphoVaultCached).safeTransfer(_treasury, vars.vaultTokensToTreasury);
         }
 
-        lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
+        vars.currentAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
             IERC4626(vars.morphoVaultCached).balanceOf(address(this))
         );
+
+        if (vars.currentAssetsValue > lastAssetsValue) {
+            lastAssetsValue = vars.currentAssetsValue;
+        }
     }
 
     /// @inheritdoc IMorphoVault
@@ -321,8 +325,12 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             IERC20(vars.morphoVaultCached).safeTransfer(vars.treasury, vars.vaultTokensToTreasury);
         }
 
-        lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
+        vars.currentAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
             IERC4626(vars.morphoVaultCached).balanceOf(address(this))
         );
+
+        if (vars.currentAssetsValue > lastAssetsValue) {
+            lastAssetsValue = vars.currentAssetsValue;
+        }
     }
 }
