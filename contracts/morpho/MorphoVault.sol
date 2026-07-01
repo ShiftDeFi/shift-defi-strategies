@@ -290,6 +290,8 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
         vars.rewardTokensLength = tokens.length;
 
         vars.treasury = IStrategyContainer(vars.strategyContainerCached).treasury();
+        require(vars.treasury != address(0), Errors.ZeroAddress());
+
         vars.feePct = IStrategyContainer(vars.strategyContainerCached).feePct();
 
         vars.accruedAssetsValue = _calculateAccruedAssetsValue();
