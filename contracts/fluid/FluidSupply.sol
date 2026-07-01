@@ -197,7 +197,6 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
             return;
         }
 
-        IERC20(fTokenCached).safeIncreaseAllowance(fTokenCached, fTokenAmountToRedeem);
         IFluidToken(fTokenCached).redeem(fTokenAmountToRedeem, address(this), address(this));
         lastAssetsValue = IFluidToken(fTokenCached).convertToAssets(IERC20(fTokenCached).balanceOf(address(this)));
     }
