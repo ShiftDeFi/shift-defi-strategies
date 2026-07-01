@@ -129,6 +129,8 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             return _underlyingAssetNav();
         } else if (stateId == MORPHO_VAULT_STATE_ID) {
             return _morphoVaultNav();
+        } else if (stateId == NO_ALLOCATION_STATE_ID) {
+            return 0;
         } else {
             revert StateNotFound(stateId);
         }
