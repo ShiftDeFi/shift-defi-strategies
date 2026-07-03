@@ -73,4 +73,14 @@ contract MorphoVaultRewardTokensTest is MorphoVaultBase {
         IMorphoVault(address(morphoVaultStrategy)).setRewardTokens(rewardTokens);
         vm.stopPrank();
     }
+
+    function testRevert_SetRewardTokens_RewardTokenMatchesMorphoVault() public {
+        address[] memory rewardTokens = new address[](1);
+        rewardTokens[0] = morphoVault;
+
+        vm.startPrank(roles.harvestManager);
+        vm.expectRevert(IMorphoVault.RewardTokenMatchesMorphoVault.selector);
+        IMorphoVault(address(morphoVaultStrategy)).setRewardTokens(rewardTokens);
+        vm.stopPrank();
+    }
 }

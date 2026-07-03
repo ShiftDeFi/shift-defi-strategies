@@ -5,7 +5,6 @@ interface IFluidSupply {
     struct AutomaticHarvestLocalVars {
         address fTokenCached;
         address merkleRewardToken;
-        uint256 lastAssetsValue;
         uint256 accruedAssetsValue;
         uint256 accruedFTokenAmount;
         uint256 fTokensToTreasury;

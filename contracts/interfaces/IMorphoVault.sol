@@ -14,6 +14,7 @@ interface IMorphoVault {
         uint256 lpAmountBefore;
         uint256 reinvestLpDelta;
         uint256 feeFromReinvest;
+        uint256 currentAssetsValue;
     }
 
     struct ManualClaimLocalVars {
@@ -30,6 +31,7 @@ interface IMorphoVault {
         address[] users;
         uint256 reinvestLpDelta;
         uint256 feeFromReinvest;
+        uint256 currentAssetsValue;
     }
 
     // ---- Events ----
@@ -39,6 +41,7 @@ interface IMorphoVault {
     // ---- Errors ----
 
     error RewardTokenMatchesUnderlyingAsset();
+    error RewardTokenMatchesMorphoVault();
 
     // ---- Functions ----
 
