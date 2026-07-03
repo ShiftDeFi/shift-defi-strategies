@@ -64,6 +64,8 @@ contract CurveGauge is StrategyTemplate, ICurveGauge {
             return _curveLpNav();
         } else if (stateId == UNDERLYING_ASSETS_STATE_ID) {
             return _underlyingAssetsNav();
+        } else if (stateId == NO_ALLOCATION_STATE_ID) {
+            return 0;
         } else {
             revert StateNotFound(stateId);
         }

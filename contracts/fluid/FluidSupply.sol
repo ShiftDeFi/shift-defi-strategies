@@ -197,20 +197,30 @@ contract FluidSupply is AccessControlUpgradeable, IFluidSupply, StrategyTemplate
             return;
         }
 
-        IERC20(fTokenCached).safeIncreaseAllowance(fTokenCached, fTokenAmountToRedeem);
         IFluidToken(fTokenCached).redeem(fTokenAmountToRedeem, address(this), address(this));
         lastAssetsValue = IFluidToken(fTokenCached).convertToAssets(IERC20(fTokenCached).balanceOf(address(this)));
+    }
+
+    function _calculateAccruedAssetsValue() private view returns (uint256) {
+        address fTokenCached = fToken;
+        uint256 lastAssetsValueCached = lastAssetsValue;
+        uint256 currentAssetsValue = IFluidToken(fTokenCached).convertToAssets(
+            IERC20(fTokenCached).balanceOf(address(this))
+        );
+
+        if (currentAssetsValue > lastAssetsValueCached) {
+            return currentAssetsValue - lastAssetsValueCached;
+        }
+
+        return 0;
     }
 
     function _harvest(bytes32 _stateId, address _treasury, uint256 _feePct) internal override {
         AutomaticHarvestLocalVars memory vars;
         vars.fTokenCached = fToken;
-        vars.lastAssetsValue = lastAssetsValue;
         vars.merkleRewardToken = merkleRewardToken;
 
-        vars.accruedAssetsValue =
-            IFluidToken(vars.fTokenCached).convertToAssets(IERC20(vars.fTokenCached).balanceOf(address(this))) -
-            vars.lastAssetsValue;
+        vars.accruedAssetsValue = _calculateAccruedAssetsValue();
 
         if (vars.accruedAssetsValue > 0) {
             vars.accruedFTokenAmount = IFluidToken(vars.fTokenCached).convertToShares(vars.accruedAssetsValue);

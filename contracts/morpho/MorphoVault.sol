@@ -112,10 +112,14 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
     function _setRewardTokens(address[] memory _rewardTokens) private {
         uint256 rewardTokensLength = _rewardTokens.length;
         address underlyingAssetCached = underlyingAsset;
-        for (uint256 i = 0; i < rewardTokensLength; i++) {
+        address morphoVaultCached = morphoVault;
+
+        for (uint256 i = 0; i < rewardTokensLength; ++i) {
             require(_rewardTokens[i] != address(0), Errors.ZeroAddress());
             require(_rewardTokens[i] != underlyingAssetCached, RewardTokenMatchesUnderlyingAsset());
+            require(_rewardTokens[i] != morphoVaultCached, RewardTokenMatchesMorphoVault());
         }
+
         rewardTokens = _rewardTokens;
         emit RewardTokensUpdated(_rewardTokens);
     }
@@ -125,6 +129,8 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             return _underlyingAssetNav();
         } else if (stateId == MORPHO_VAULT_STATE_ID) {
             return _morphoVaultNav();
+        } else if (stateId == NO_ALLOCATION_STATE_ID) {
+            return 0;
         } else {
             revert StateNotFound(stateId);
         }
@@ -258,9 +264,13 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             IERC20(vars.morphoVaultCached).safeTransfer(_treasury, vars.vaultTokensToTreasury);
         }
 
-        lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
+        vars.currentAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
             IERC4626(vars.morphoVaultCached).balanceOf(address(this))
         );
+
+        if (vars.currentAssetsValue > lastAssetsValue) {
+            lastAssetsValue = vars.currentAssetsValue;
+        }
     }
 
     /// @inheritdoc IMorphoVault
@@ -280,6 +290,8 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
         vars.rewardTokensLength = tokens.length;
 
         vars.treasury = IStrategyContainer(vars.strategyContainerCached).treasury();
+        require(vars.treasury != address(0), Errors.ZeroAddress());
+
         vars.feePct = IStrategyContainer(vars.strategyContainerCached).feePct();
 
         vars.accruedAssetsValue = _calculateAccruedAssetsValue();
@@ -295,19 +307,21 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
         IAngleMerkleDistributor(merkleDistributor).claim(vars.users, tokens, amounts, proofs);
 
-        for (uint256 i = 0; i < vars.rewardTokensLength; i++) {
-            if (tokens[i] == vars.underlyingAssetCached) {
-                _enterMorphoVault();
-                break;
+        if (currentStateId() == MORPHO_VAULT_STATE_ID) {
+            for (uint256 i = 0; i < vars.rewardTokensLength; i++) {
+                if (tokens[i] == vars.underlyingAssetCached) {
+                    _enterMorphoVault();
+                    break;
+                }
             }
-        }
 
-        vars.reinvestLpDelta = IERC4626(vars.morphoVaultCached).balanceOf(address(this)) - vars.lpAmountBefore;
+            vars.reinvestLpDelta = IERC4626(vars.morphoVaultCached).balanceOf(address(this)) - vars.lpAmountBefore;
 
-        if (vars.reinvestLpDelta > 0) {
-            vars.feeFromReinvest = vars.reinvestLpDelta.mulDiv(vars.feePct, MAX_BPS);
-            if (vars.feeFromReinvest > 0) {
-                vars.vaultTokensToTreasury += vars.feeFromReinvest;
+            if (vars.reinvestLpDelta > 0) {
+                vars.feeFromReinvest = vars.reinvestLpDelta.mulDiv(vars.feePct, MAX_BPS);
+                if (vars.feeFromReinvest > 0) {
+                    vars.vaultTokensToTreasury += vars.feeFromReinvest;
+                }
             }
         }
 
@@ -315,8 +329,12 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             IERC20(vars.morphoVaultCached).safeTransfer(vars.treasury, vars.vaultTokensToTreasury);
         }
 
-        lastAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
+        vars.currentAssetsValue = IERC4626(vars.morphoVaultCached).convertToAssets(
             IERC4626(vars.morphoVaultCached).balanceOf(address(this))
         );
+
+        if (vars.currentAssetsValue > lastAssetsValue) {
+            lastAssetsValue = vars.currentAssetsValue;
+        }
     }
 }
