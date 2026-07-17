@@ -9,4 +9,8 @@ optimizer-runs = 20
 [lint]
 exclude_lints = ["mixed-case-function", "mixed-case-variable"]
 
+[rpc_endpoints]
+ethereum = "${ETH_RPC_URL}"
+arbitrum = "${ARB_RPC_URL}"
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
