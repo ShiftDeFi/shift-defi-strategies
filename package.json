@@ -1,4 +1,23 @@
 {
+  "name": "@shift-defi/strategies",
+  "version": "0.1.0",
+  "description": "Strategy smart contracts for Shift DeFi Platform",
+  "author": "ShiftDeFi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShiftDeFi/shift-defi-strategies"
+  },
+  "homepage": "https://shiftdefi.com/",
+  "files": [
+    "contracts/**/*.sol"
+  ],
+  "scripts": {
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@shift-defi/core": "^0.7.0"
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
@@ -14,11 +33,5 @@
     "*.{ts,json,md,yml,yaml}": [
       "prettier --write"
     ]
-  },
-  "scripts": {
-    "prepare": "husky"
-  },
-  "dependencies": {
-    "@shift-defi/core": "^0.7.0"
   }
 }
