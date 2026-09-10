@@ -13,7 +13,9 @@
     "contracts/**/*.sol"
   ],
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "claim": "set -a; [ -f tools/merkl-claim.env ] && . ./tools/merkl-claim.env; set +a; node tools/merkl-claim.mjs",
+    "claim:propose": "npm run claim -- --propose"
   },
   "dependencies": {
     "@shift-defi/core": "^0.7.0"
@@ -30,7 +32,7 @@
     "*.sol": [
       "prettier --write --plugin=prettier-plugin-solidity"
     ],
-    "*.{ts,json,md,yml,yaml}": [
+    "*.{ts,mjs,json,md,yml,yaml}": [
       "prettier --write"
     ]
   }
