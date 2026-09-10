@@ -21,3 +21,6 @@ package-lock.json
 foundry.lock
 
 lcov.info
+
+# Tools output
+claim.json
