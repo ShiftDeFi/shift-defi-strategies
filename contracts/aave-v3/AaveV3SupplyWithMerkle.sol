@@ -13,6 +13,8 @@ import {AaveV3Supply} from "./AaveV3Supply.sol";
 import {IAngleMerkleDistributor} from "../dependencies/angle/IAngleMerkleDistributor.sol";
 import {IAaveV3SupplyWithMerkle} from "../interfaces/IAaveV3SupplyWithMerkle.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 /// @notice `AaveV3Supply` extended with a Merkle-distributed reward token (e.g. WMON on Aave V3 Monad):
 ///         automatic harvest swaps the reward token back to the reserve asset and reinvests it, and a
 ///         role-gated `manualClaim` pulls rewards from an Angle-style Merkle distributor - the same
@@ -153,6 +155,7 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAave
 
         vars.users = new address[](1);
         vars.users[0] = address(this);
+        console2.log("merkleDistributor", merkleDistributor);
         IAngleMerkleDistributor(merkleDistributor).claim(vars.users, tokens, amounts, proofs);
 
         // Only the notion token is reinvested here; any other reward (e.g. WMON) is left on the

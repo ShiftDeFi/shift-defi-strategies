@@ -24,10 +24,11 @@ contract AaveV3SupplyWithMerkleManualClaimTest is AaveV3SupplyWithMerkleBase {
 
     MockAngleMerkleDistributor internal mockDistributor;
 
-    function setUp() public override {
+    /// @dev Deployed here rather than in `setUp()` directly, so it lands strictly after
+    ///      `MonadContext`'s fork switch (see the ordering note in `AaveV3SupplyWithMerkleBase`).
+    function _resolveMerkleDistributor() internal override returns (address) {
         mockDistributor = new MockAngleMerkleDistributor();
-        merkleDistributor = address(mockDistributor);
-        super.setUp();
+        return address(mockDistributor);
     }
 
     function test_ManualClaim_ReinvestsReserveAssetInstantly() public {

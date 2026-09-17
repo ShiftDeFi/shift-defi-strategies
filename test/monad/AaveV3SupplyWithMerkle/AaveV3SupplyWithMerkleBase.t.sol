@@ -20,10 +20,6 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
 
     IStrategyTemplate internal aaveSupplyStrategy;
 
-    /// @dev Set by the concrete test contract before `super.setUp()` - the real Angle distributor for
-    ///      the Usdc deployment test, a `MockAngleMerkleDistributor` for the manual-claim unit tests.
-    address internal merkleDistributor;
-
     uint256 internal constant ENTER_AMOUNT = 100_000;
     uint256 internal constant NAV_TOLERANCE_PCT = 2e14; // 0.02%
 
@@ -43,6 +39,11 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
 
     function setUp() public virtual override {
         super.setUp();
+
+        // Resolved after the fork switch above, not before: a `MockAngleMerkleDistributor` deployed any
+        // earlier would land on whatever fork was active before `MonadContext.setUp()` ran, which vanishes
+        // once the switch happens (e.g. a `--fork-url` CLI flag establishing a separate root fork).
+        address merkleDistributor = _resolveMerkleDistributor();
 
         address[] memory rewardTokens = new address[](1);
         rewardTokens[0] = WMON;
@@ -71,6 +72,12 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
         inputTokens[0] = USDC;
 
         _addStrategy(address(aaveSupplyStrategy), inputTokens, inputTokens);
+    }
+
+    /// @dev Overridden by the manual-claim unit tests to deploy a `MockAngleMerkleDistributor` instead -
+    ///      see the ordering note on the call site above.
+    function _resolveMerkleDistributor() internal virtual returns (address) {
+        return AAVE_MERKLE_DISTRIBUTOR;
     }
 
     function _enterStrategy() internal {

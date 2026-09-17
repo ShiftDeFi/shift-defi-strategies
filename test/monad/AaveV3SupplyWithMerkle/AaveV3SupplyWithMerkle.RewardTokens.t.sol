@@ -7,11 +7,6 @@ import {IAaveV3SupplyWithMerkle} from "contracts/interfaces/IAaveV3SupplyWithMer
 import {AaveV3SupplyWithMerkleBase} from "./AaveV3SupplyWithMerkleBase.t.sol";
 
 contract AaveV3SupplyWithMerkleRewardTokensTest is AaveV3SupplyWithMerkleBase {
-    function setUp() public override {
-        merkleDistributor = AAVE_MERKLE_DISTRIBUTOR;
-        super.setUp();
-    }
-
     function test_SetRewardTokens() public {
         uint256 rewardTokensLength = 3;
         address[] memory rewardTokens = new address[](rewardTokensLength);

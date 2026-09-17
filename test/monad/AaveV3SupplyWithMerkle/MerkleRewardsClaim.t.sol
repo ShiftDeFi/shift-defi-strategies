@@ -6,22 +6,23 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IAngleMerkleDistributor} from "contracts/dependencies/angle/IAngleMerkleDistributor.sol";
 import {Test} from "forge-std/Test.sol";
 
-/// @dev Replays a real Monad mainnet claim (see the "Rewards claim" transaction example in
-///      entry-exit-design/AaveV3MonadUSDC.md - tx 0x14562de1d8d2bfce3d9c1f3ac70fab25902bc0e3e71ed86a64c5314902c4ceb1,
-///      mined at block 101_871_052) one block before it actually landed, to prove the real Angle Merkle
-///      distributor and this exact historical proof both still work. `EXPECTED_REWARDS` is the real
-///      amount that tx's own Transfer log paid out (confirmed via the receipt), which also confirms this
-///      was REWARD_WHALE's first-ever claim of this token (the full cumulative amount was paid as the
-///      delta). Requires `MONAD_RPC_URL` - not part of `make verify`.
+/// @dev Replays a real Monad mainnet claim (tx
+///      0xabdde1c89f4d16db2ea8499ea7d4a8b45203f299262d8476f0c8961634831cf2, mined at block 105_592_537 -
+///      one of a 3-token claim; only the hyAUSD leg is replayed here) one block before it actually landed,
+///      to prove the real Angle Merkle distributor and this exact historical proof both still work.
+///      `CUMULATIVE_AMOUNT` is the full lifetime-cumulative amount claimable as of this proof;
+///      `EXPECTED_REWARDS` is the smaller delta actually paid out by that tx (confirmed via its Transfer
+///      log), since REWARD_WHALE had already claimed most of this token's cumulative total in earlier
+///      epochs. Requires `MONAD_RPC_URL` - not part of `make verify`.
 contract MerkleRewardsClaimTest is Test {
     string private RPC_URL = vm.envString("MONAD_RPC_URL");
-    uint256 private constant FORK_BLOCK_NUMBER = 101_871_051;
+    uint256 private constant FORK_BLOCK_NUMBER = 105_592_536;
 
-    address private constant REWARD_WHALE = 0xa4e102c843765053E17998F18Ad1b6a740281615;
+    address private constant REWARD_WHALE = 0xace64DBF9B86975756A79a28A8614e9E97c707a6;
     address private constant ANGLE_MERKLE_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
-    address private constant CLAIMED_TOKEN = 0x561Ad6156D0106E7a59EE788759dF7B7Ec679BD0;
-    uint256 private constant CUMULATIVE_AMOUNT = 13255056721191557;
-    uint256 private constant EXPECTED_REWARDS = 13255056721191557;
+    address private constant CLAIMED_TOKEN = 0xaD663aC84052b52BE4ed1b27BA416505e84a00Bf; // hyAUSD
+    uint256 private constant CUMULATIVE_AMOUNT = 567561394;
+    uint256 private constant EXPECTED_REWARDS = 393;
 
     function setUp() public {
         vm.createSelectFork(RPC_URL, FORK_BLOCK_NUMBER);
@@ -38,22 +39,22 @@ contract MerkleRewardsClaimTest is Test {
         bytes32[][] memory claimProofs = new bytes32[][](1);
         bytes32[] memory proof = new bytes32[](16);
 
-        proof[0] = 0xedc4099ab2610f6654ec5806e866f1ceea3fe5c30c634223528b9c433af39c16;
-        proof[1] = 0x9cf04b09b39da67b6993d5c4ee8c149fd5ad47b1b621a19a58f59f441a0326cc;
-        proof[2] = 0xa3c091acebecfe193cfbc81073240ab8d9cd183120da0b3fd75a3a28f3f712d0;
-        proof[3] = 0x35e84900244cabc3088b15aada5e5a4ee17a71e0a5d0e84084bfbc0aae2a2cdc;
-        proof[4] = 0x99aaffd5ea9c2538beafa5c1255f032675d0f4c492b522f4eba83975cc1fe492;
-        proof[5] = 0xa45bd9fc5f697ac7c3c1cc3b6df362d142978c07f9c023cb8aceeb34c280423a;
-        proof[6] = 0xaaee303062cc076b715eec06a90ddb1fb28db297b5664f4031ad944a58a44591;
-        proof[7] = 0x22cd4ebd451d6dc984bb10c3468cca83faf34c63d5cd27ad300f2cfccd7d2dd8;
-        proof[8] = 0x37da78bb275439b09cd0d6cb822cfe3ce1b9630f9eb7127cf3ac1385324bd733;
-        proof[9] = 0x9b613f897c4c64f15e620c82203a3f50a857b6b04f587de8e3fa70e8b959635f;
-        proof[10] = 0x22973d2b59aba3288e36e3dffa87b4d37346b9bf4b5ff88e167938afed830918;
-        proof[11] = 0x00a8d7805b18e81596e7b3bfa9c1197e1ea0313ee5307de556eb15f4a6f58637;
-        proof[12] = 0x61cdf39c9cef68e80e7f54df1dfaf254edc636dbc62e5f818afc278993423a84;
-        proof[13] = 0xcd2e549f855a0dcda17d13042ed2b5f9c459f2a32d684d4923fc10218d62dbff;
-        proof[14] = 0xcdb9b7b2687f877a98826be99b1eda0d0c7bc431c0f3a97a5f919c596034cd63;
-        proof[15] = 0x724b4c81f103b8c6761393b6977f160e5767cf1da3fa65e6b12f5cedf2e62080;
+        proof[0] = 0x66017832a88781cea95e3d11810d4b2e43555833fc1d1425fa19fa8041128447;
+        proof[1] = 0x264c70ffe5678bfaae1e2669a19ac740eeadb8bf54aecf752e05421da2529c1f;
+        proof[2] = 0x6df98f1dbdfe9190c7eca1896b463c0c38c9afde4a46c31967999df7f063ffdd;
+        proof[3] = 0x7d150c587b1a700c4ff0e1b5499966acdf77613602e671003add9625deaf6a80;
+        proof[4] = 0x441fffbfa77c40745e9244ec75d2529173882e312a4dbd9e35bc47e05792158a;
+        proof[5] = 0x684ddd81deed1ecf7e1907638d39243e47b91aed81ed633e93c6a31b3738308a;
+        proof[6] = 0xe01ee02491e912c61e5489376b2b17ed08465325998ec71fec0e80dc40ae772a;
+        proof[7] = 0xf568b8237af39a4adaf18e1d8423e411b79431e5c47a03663399483b0d5c3715;
+        proof[8] = 0xed9583cb0beab4c7073dd1e40a59662dd9d7994db9f7734b9d97701bf44dff15;
+        proof[9] = 0xab3fddafe9cff795768a638ccb423a180e310db34b833460348ee831fc8274e6;
+        proof[10] = 0x2ae10470c106c9970a497637636faca22a034b19ad012f0d295cb241b6985a06;
+        proof[11] = 0xcfa5f3510bf968db3f6a09ac0934575c520a6a36497a2ba60e522f2d5e09a4aa;
+        proof[12] = 0x7f3602ea396cb55be1d2acdef136f7a676bba2ffc9a7849f499bff1e3f595223;
+        proof[13] = 0x46475518cf3b129f7799c926985bf751d03cefcfc2ab9b33a47bd805376ae2b1;
+        proof[14] = 0x4ec98d40af0fa994d0cafef3d8d2262efb13b5afdcb94f6d704a4a5b8014007a;
+        proof[15] = 0x59de45a1cfe691a6b3fa10e23e6045b7ec218c0c32201a96e9b70ee07f917b19;
         claimProofs[0] = proof;
 
         uint256 balanceBefore = IERC20(CLAIMED_TOKEN).balanceOf(REWARD_WHALE);

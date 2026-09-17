@@ -16,18 +16,18 @@ import {ISwapRouter} from "@shift-defi/core/interfaces/ISwapRouter.sol";
 
 import {BaseConfig} from "test/BaseConfig.sol";
 import {MockStrategyContainer} from "test/mocks/MockStrategyContainer.sol";
+import {MockWmonUsdcSwapAdapter} from "test/mocks/MockWmonUsdcSwapAdapter.sol";
 
 /// @notice Shared Monad mainnet-fork context, run against the local anvil fork at `monad_local`
 ///         (http://localhost:8545 - see foundry.toml). Unlike `EthContext`, none of the core Shift
 ///         contracts (SwapRouter, StrategyContainer, PriceOracleAggregator) are live on Monad yet, so
 ///         this context deploys fresh instances of each rather than pointing at production addresses.
-/// @dev The one thing already live on the fork is the WMON -> USDC predefined-swap adapter: it was
-///      deployed and had its internal path whitelisted by shift-defi-swap-adapters' `Deploy.s.sol` /
-///      `WhitelistWmonUsdc.s.sol` broadcasts against this same local node (see
-///      broadcast/{Deploy.s.sol,WhitelistWmonUsdc.s.sol}/143 there). This context registers that adapter
-///      as the freshly-deployed core SwapRouter's predefined swap for the pair, so
-///      `_swapToInputTokens(WMON, USDC, ...)` in the strategy under test resolves to a real Uniswap V3
-///      swap against live Monad liquidity, not a no-op.
+/// @dev The WMON -> USDC predefined-swap adapter is resolved via `_resolveWmonUsdcSwapAdapter`: if
+///      `WMON_USDC_SWAP_ADAPTER` is set in the environment, that address is used directly (e.g. the real
+///      `UniswapV3SwapRouter02` adapter deployed and whitelisted on a given fork by shift-defi-swap-adapters'
+///      `Deploy.s.sol` / `WhitelistWmonUsdc.s.sol` broadcasts). Otherwise a `MockWmonUsdcSwapAdapter` is
+///      deployed and pre-funded with USDC, so the suite still exercises a real (if not real-liquidity)
+///      `_swapToInputTokens(WMON, USDC, ...)` swap rather than a no-op on a fork where no adapter exists.
 abstract contract MonadContext is BaseConfig {
     // Real Monad mainnet addresses (see entry-exit-design/AaveV3MonadUSDC.md)
     address internal constant USDC = 0x754704Bc059F8C67012fEd69BC8A327a5aafb603;
@@ -39,10 +39,9 @@ abstract contract MonadContext is BaseConfig {
 
     address internal constant WMON = 0x3bd359C1119dA7Da1D913D1C4D2B7c461115433A;
 
-    /// @dev `UniswapV3SwapRouter02` adapter deployed on this local fork (not a production Monad mainnet
-    ///      address) with the WMON -> USDC (fee 3000) path already whitelisted internally.
-    address internal constant WMON_USDC_SWAP_ADAPTER = 0x294190aaFeE995ffbBf655F223b456c89C2b70bA;
     uint24 internal constant WMON_USDC_FEE = 3000;
+    uint256 internal constant MOCK_USDC_PER_WMON = 2e6; // 2 USDC per WMON, 6 decimals
+    uint256 internal constant MOCK_ADAPTER_USDC_LIQUIDITY = 10_000_000 * 10 ** 6;
 
     address internal priceOracleAggregator;
     address internal swapRouter;
@@ -50,7 +49,7 @@ abstract contract MonadContext is BaseConfig {
     function setUp() public virtual override {
         super.setUp();
 
-        vm.createSelectFork(vm.rpcUrl("monad_local"));
+        vm.createSelectFork(vm.rpcUrl("monad"));
 
         vm.label(USDC, "USDC");
         vm.label(USDC_PRICE_FEED, "USDC_PRICE_FEED");
@@ -58,7 +57,6 @@ abstract contract MonadContext is BaseConfig {
         vm.label(A_MON_USDC, "A_MON_USDC");
         vm.label(AAVE_MERKLE_DISTRIBUTOR, "AAVE_MERKLE_DISTRIBUTOR");
         vm.label(WMON, "WMON");
-        vm.label(WMON_USDC_SWAP_ADAPTER, "WMON_USDC_SWAP_ADAPTER");
 
         _deployPriceOracleAggregator();
         _deploySwapRouter();
@@ -97,12 +95,29 @@ abstract contract MonadContext is BaseConfig {
         );
         vm.label(swapRouter, "SWAP_ROUTER");
 
+        address adapter = _resolveWmonUsdcSwapAdapter();
         bytes memory path = abi.encodePacked(WMON, WMON_USDC_FEE, USDC);
 
         vm.startPrank(whitelistManager);
-        ISwapRouter(swapRouter).whitelistSwapAdapter(WMON_USDC_SWAP_ADAPTER);
-        ISwapRouter(swapRouter).setPredefinedSwapParameters(WMON, USDC, WMON_USDC_SWAP_ADAPTER, path);
+        ISwapRouter(swapRouter).whitelistSwapAdapter(adapter);
+        ISwapRouter(swapRouter).setPredefinedSwapParameters(WMON, USDC, adapter, path);
         vm.stopPrank();
+    }
+
+    /// @dev Uses `WMON_USDC_SWAP_ADAPTER` from the environment if set (a real adapter already deployed and
+    ///      whitelisted on the target fork); otherwise deploys and funds `MockWmonUsdcSwapAdapter` so the
+    ///      suite still exercises a real swap rather than silently no-opping on a fork with no adapter.
+    function _resolveWmonUsdcSwapAdapter() private returns (address) {
+        address configured = vm.envOr("WMON_USDC_SWAP_ADAPTER", address(0));
+        if (configured != address(0)) {
+            vm.label(configured, "WMON_USDC_SWAP_ADAPTER");
+            return configured;
+        }
+
+        address mockAdapter = address(new MockWmonUsdcSwapAdapter(WMON, USDC, MOCK_USDC_PER_WMON));
+        deal(USDC, mockAdapter, MOCK_ADAPTER_USDC_LIQUIDITY, true);
+        vm.label(mockAdapter, "MOCK_WMON_USDC_SWAP_ADAPTER");
+        return mockAdapter;
     }
 
     function _deployMockStrategyContainer() private {
