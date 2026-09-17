@@ -1,39 +1,39 @@
 {
-  "name": "@shift-defi/strategies",
-  "version": "0.1.0",
-  "description": "Strategy smart contracts for Shift DeFi Platform",
-  "author": "ShiftDeFi",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ShiftDeFi/shift-defi-strategies"
-  },
-  "homepage": "https://shiftdefi.com/",
-  "files": [
-    "contracts/**/*.sol"
-  ],
-  "scripts": {
-    "prepare": "husky",
-    "claim": "set -a; [ -f tools/merkl-claim.env ] && . ./tools/merkl-claim.env; set +a; node tools/merkl-claim.mjs",
-    "claim:propose": "npm run claim -- --propose"
-  },
-  "dependencies": {
-    "@shift-defi/core": "^0.7.0"
-  },
-  "devDependencies": {
-    "@commitlint/cli": "^20.2.0",
-    "@commitlint/config-conventional": "^20.2.0",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
-    "prettier": "^3.7.4",
-    "prettier-plugin-solidity": "^2.2.1"
-  },
-  "lint-staged": {
-    "*.sol": [
-      "prettier --write --plugin=prettier-plugin-solidity"
+    "name": "@shift-defi/strategies",
+    "version": "0.1.0",
+    "description": "Strategy smart contracts for Shift DeFi Platform",
+    "author": "ShiftDeFi",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ShiftDeFi/shift-defi-strategies"
+    },
+    "homepage": "https://shiftdefi.com/",
+    "files": [
+        "contracts/**/*.sol"
     ],
-    "*.{ts,mjs,json,md,yml,yaml}": [
-      "prettier --write"
-    ]
-  }
+    "scripts": {
+        "prepare": "husky",
+        "claim": "set -a; [ -f tools/merkl-claim.env ] && . ./tools/merkl-claim.env; set +a; node tools/merkl-claim.mjs",
+        "claim:propose": "npm run claim -- --propose"
+    },
+    "dependencies": {
+        "@shift-defi/core": "^0.7.1"
+    },
+    "devDependencies": {
+        "@commitlint/cli": "^20.2.0",
+        "@commitlint/config-conventional": "^20.2.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.2.7",
+        "prettier": "^3.7.4",
+        "prettier-plugin-solidity": "^2.2.1"
+    },
+    "lint-staged": {
+        "*.sol": [
+            "prettier --write --plugin=prettier-plugin-solidity"
+        ],
+        "*.{ts,mjs,json,md,yml,yaml}": [
+            "prettier --write"
+        ]
+    }
 }

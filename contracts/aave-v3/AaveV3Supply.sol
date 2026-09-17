@@ -10,8 +10,9 @@ import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.s
 import {Errors} from "@shift-defi/core/libraries/Errors.sol";
 
 import {IPool} from "../dependencies/aave-v3/IPool.sol";
+import {IAaveV3Supply} from "../interfaces/IAaveV3Supply.sol";
 
-contract AaveV3Supply is StrategyTemplate {
+contract AaveV3Supply is StrategyTemplate, IAaveV3Supply {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -28,15 +29,10 @@ contract AaveV3Supply is StrategyTemplate {
     uint256 public lastReserveATokenBalance;
 
     /// @notice State ID for the underlying asset state (holding the asset directly)
-    bytes32 private constant UNDERLYING_ASSET_STATE_ID = keccak256("UNDERLYING_ASSET_STATE_ID");
+    bytes32 internal constant UNDERLYING_ASSET_STATE_ID = keccak256("UNDERLYING_ASSET_STATE_ID");
 
     /// @notice State ID for the Aave reserve supplied state (asset supplied to Aave)
-    bytes32 private constant AAVE_RESERVE_SUPPLIED_STATE_ID = keccak256("AAVE_RESERVE_SUPPLIED_STATE_ID");
-
-    error NotEnoughUnderlyingAssetLiquidity();
-    error NoReserveAllocation();
-    error WithdrawAmountTooSmall();
-    error WithdrawAmountMismatch();
+    bytes32 internal constant AAVE_RESERVE_SUPPLIED_STATE_ID = keccak256("AAVE_RESERVE_SUPPLIED_STATE_ID");
 
     struct SlippageParams {
         uint256 enterMaxSlippage;
@@ -60,6 +56,17 @@ contract AaveV3Supply is StrategyTemplate {
         address _reserveAsset,
         SlippageParams calldata slippageParams
     ) external initializer {
+        __AaveV3Supply_init(strategyContainer, _pool, _reserveAsset, slippageParams);
+    }
+
+    /// @dev Shared initializer logic, exposed so subclasses can compose it with their own additional setup
+    ///      inside a single `initializer`-guarded call.
+    function __AaveV3Supply_init(
+        address strategyContainer,
+        address _pool,
+        address _reserveAsset,
+        SlippageParams calldata slippageParams
+    ) internal onlyInitializing {
         __StrategyTemplate_init(
             strategyContainer,
             slippageParams.enterMaxSlippage,
@@ -120,13 +127,20 @@ contract AaveV3Supply is StrategyTemplate {
         }
     }
 
+    /// @dev No-op on a zero balance rather than reverting, matching `FluidSupply`/`MorphoVault`: entering
+    ///      with nothing new to deposit is routine (e.g. a state re-affirmation with no incoming funds, or
+    ///      a subclass reinvesting a reward/claim that happened to swap to nothing), not an error, and
+    ///      must not block the container. `internal` so a subclass can reuse it directly as its own
+    ///      reinvest-into-Aave step.
     function _enterAaveReserveSupplied() internal {
-        address poolCached = pool;
         address reserveAssetCached = reserveAsset;
-
         uint256 underlyingAssetBalance = IERC20(reserveAssetCached).balanceOf(address(this));
-        require(underlyingAssetBalance > 0, NotEnoughUnderlyingAssetLiquidity());
 
+        if (underlyingAssetBalance == 0) {
+            return;
+        }
+
+        address poolCached = pool;
         IERC20(reserveAssetCached).safeIncreaseAllowance(poolCached, underlyingAssetBalance);
         IPool(poolCached).supply(reserveAssetCached, underlyingAssetBalance, address(this), 0);
         lastReserveATokenBalance = IERC20(reserveAToken).balanceOf(address(this));
@@ -160,23 +174,26 @@ contract AaveV3Supply is StrategyTemplate {
         }
     }
 
-    function _harvest(bytes32, address treasury, uint256 feePct) internal override {
-        address reserveATokenCached = reserveAToken;
-        uint256 currentReserveATokenBalance = IERC20(reserveATokenCached).balanceOf(address(this));
-        uint256 lastReserveATokenBalanceCached = lastReserveATokenBalance;
+    function _harvest(bytes32, address treasury, uint256 feePct) internal virtual override {
+        AaveHarvestLocalVars memory vars;
+        vars.reserveATokenCached = reserveAToken;
+        vars.currentReserveATokenBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
+        vars.lastReserveATokenBalanceCached = lastReserveATokenBalance;
 
-        if (currentReserveATokenBalance <= lastReserveATokenBalanceCached) {
+        if (vars.currentReserveATokenBalance <= vars.lastReserveATokenBalanceCached) {
             return;
         }
 
-        uint256 income = currentReserveATokenBalance - lastReserveATokenBalanceCached;
-        uint256 fee = income.mulDiv(feePct, MAX_BPS);
+        vars.income = vars.currentReserveATokenBalance - vars.lastReserveATokenBalanceCached;
+        // Capped to the actual balance so a rounding edge case can never make the fee transfer revert -
+        // harvest runs ahead of every enter/exit and must not be able to block the container.
+        vars.fee = Math.min(vars.income.mulDiv(feePct, MAX_BPS), vars.currentReserveATokenBalance);
 
-        if (fee > 0) {
-            IERC20(reserveATokenCached).safeTransfer(treasury, fee);
+        if (vars.fee > 0) {
+            IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
         }
 
-        lastReserveATokenBalance = IERC20(reserveATokenCached).balanceOf(address(this));
+        lastReserveATokenBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
     }
 
     function _exitAaveReserveSuppliedFlat(uint256 amount) internal returns (uint256) {
