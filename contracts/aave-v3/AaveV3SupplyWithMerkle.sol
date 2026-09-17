@@ -13,8 +13,6 @@ import {AaveV3Supply} from "./AaveV3Supply.sol";
 import {IAngleMerkleDistributor} from "../dependencies/angle/IAngleMerkleDistributor.sol";
 import {IAaveV3SupplyWithMerkle} from "../interfaces/IAaveV3SupplyWithMerkle.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @notice `AaveV3Supply` extended with a Merkle-distributed reward token (e.g. WMON on Aave V3 Monad):
 ///         automatic harvest swaps the reward token back to the reserve asset and reinvests it, and a
 ///         role-gated `manualClaim` pulls rewards from an Angle-style Merkle distributor - the same
@@ -124,10 +122,8 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAave
             return;
         }
 
-        vars.fee = Math.min(
-            (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS),
-            vars.currentBalance
-        );
+        vars.fee =
+            Math.min((vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS), vars.currentBalance);
         if (vars.fee > 0) {
             IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
         }
@@ -136,16 +132,16 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAave
     }
 
     /// @inheritdoc IAaveV3SupplyWithMerkle
-    function manualClaim(
-        address[] calldata tokens,
-        uint256[] calldata amounts,
-        bytes32[][] calldata proofs
-    ) external nonReentrant onlyRole(MERKLE_CLAIMER_ROLE) {
+    function manualClaim(address[] calldata tokens, uint256[] calldata amounts, bytes32[][] calldata proofs)
+        external
+        nonReentrant
+        onlyRole(MERKLE_CLAIMER_ROLE)
+    {
         require(!isNavResolutionMode(), NavResolutionModeActivated());
+        require(currentStateId() == AAVE_RESERVE_SUPPLIED_STATE_ID, NotInAaveSuppliedState());
 
         ManualClaimLocalVars memory vars;
         vars.reserveATokenCached = reserveAToken;
-        vars.notionCached = _notion;
         vars.strategyContainerCached = _strategyContainer;
 
         vars.treasury = IStrategyContainer(vars.strategyContainerCached).treasury();
@@ -155,28 +151,20 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAave
 
         vars.users = new address[](1);
         vars.users[0] = address(this);
-        console2.log("merkleDistributor", merkleDistributor);
         IAngleMerkleDistributor(merkleDistributor).claim(vars.users, tokens, amounts, proofs);
 
-        // Only the notion token is reinvested here; any other reward (e.g. WMON) is left on the
-        // contract and swept by the next automatic harvest instead.
-        if (currentStateId() == AAVE_RESERVE_SUPPLIED_STATE_ID) {
-            uint256 tokensLength = tokens.length;
-            for (uint256 i = 0; i < tokensLength; ++i) {
-                if (tokens[i] == vars.notionCached) {
-                    _enterAaveReserveSupplied();
-                    break;
-                }
+        uint256 tokensLength = tokens.length;
+        for (uint256 i = 0; i < tokensLength; ++i) {
+            if (tokens[i] == reserveAsset) {
+                _enterAaveReserveSupplied();
+                break;
             }
         }
 
-        // One combined delta: the pre-claim checkpoint captures both accrued lending interest and any
-        // notion-token reinvestment above, taxed once and capped to the actual balance.
         vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
         if (vars.currentBalance > vars.lastBalanceCached) {
             vars.fee = Math.min(
-                (vars.currentBalance - vars.lastBalanceCached).mulDiv(vars.feePct, MAX_BPS),
-                vars.currentBalance
+                (vars.currentBalance - vars.lastBalanceCached).mulDiv(vars.feePct, MAX_BPS), vars.currentBalance
             );
             if (vars.fee > 0) {
                 IERC20(vars.reserveATokenCached).safeTransfer(vars.treasury, vars.fee);

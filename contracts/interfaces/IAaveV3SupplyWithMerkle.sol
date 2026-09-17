@@ -15,7 +15,6 @@ interface IAaveV3SupplyWithMerkle {
 
     struct ManualClaimLocalVars {
         address reserveATokenCached;
-        address notionCached;
         address strategyContainerCached;
         address treasury;
         uint256 feePct;
@@ -33,6 +32,7 @@ interface IAaveV3SupplyWithMerkle {
 
     error RewardTokenMatchesReserveAsset();
     error RewardTokenMatchesReserveAToken();
+    error NotInAaveSuppliedState();
 
     // ---- Functions ----
 
