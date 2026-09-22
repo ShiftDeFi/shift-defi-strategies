@@ -9,13 +9,17 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transp
 /// @title UpgradeBase
 /// @notice Shared logic for strategy implementation upgrades.
 /// @dev The proxies are OpenZeppelin v5 `TransparentUpgradeableProxy` instances. Each proxy owns its own
-///      `ProxyAdmin` contract, whose owner is the multisig. Because the multisig cannot broadcast from a Foundry
-///      script, this base only broadcasts the new implementation deployment and then *prints* the calldata the
-///      multisig has to execute on the `ProxyAdmin` to perform the upgrade. That upgrade transaction itself is
-///      never broadcast from here.
+///      `ProxyAdmin` contract, and the upgrade is performed by the `ProxyAdmin` owner via
+///      `ProxyAdmin.upgradeAndCall(proxy, impl, data)`.
+///
+///      Two operating modes, selected by the `EXECUTE_UPGRADE` env var (default: false):
+///        - false (multisig admin): the new implementation is deployed and the exact `upgradeAndCall`
+///          calldata is printed for the multisig (ProxyAdmin owner) to execute. The upgrade itself is
+///          NOT broadcast from here.
+///        - true (EOA admin owned by the broadcaster): the new implementation is deployed AND the upgrade
+///          is executed in the same broadcast. Only valid when the broadcasting account owns the ProxyAdmin.
 abstract contract UpgradeBase is Script {
     /// @dev ERC-1967 admin storage slot: `bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)`.
-    ///      The `ProxyAdmin` contract address for a transparent proxy is stored here.
     bytes32 internal constant ERC1967_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     /// @dev ERC-1967 implementation storage slot: `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
@@ -32,35 +36,59 @@ abstract contract UpgradeBase is Script {
         return address(uint160(uint256(vm.load(proxy, ERC1967_IMPLEMENTATION_SLOT))));
     }
 
-    /// @notice Builds and prints the multisig calldata that upgrades `proxy` to `newImplementation`.
-    /// @dev Assumes `newImplementation` has already been deployed. Does NOT broadcast anything.
+    /// @notice Either executes the upgrade (EXECUTE_UPGRADE=true) or prints the multisig calldata.
+    /// @dev Assumes `newImplementation` has already been deployed. When executing, this MUST be called
+    ///      inside an active broadcast whose sender owns the proxy's `ProxyAdmin`.
     /// @param label Human-readable name of the strategy being upgraded (for logs).
     /// @param proxy The transparent proxy whose implementation should be upgraded.
     /// @param newImplementation The freshly deployed implementation the proxy should point to.
     /// @param reinitializeData Optional calldata forwarded to the new implementation during the upgrade
     ///        (empty for a plain implementation swap with no re-initialization).
-    /// @return upgradeCalldata The calldata the multisig must send to the `ProxyAdmin`.
-    function _prepareUpgradeCalldata(
+    function _upgrade(
         string memory label,
         address proxy,
         address newImplementation,
         bytes memory reinitializeData
-    ) internal view returns (bytes memory upgradeCalldata) {
+    ) internal {
         require(proxy != address(0), "UpgradeBase: proxy is zero address");
         require(newImplementation != address(0), "UpgradeBase: implementation is zero address");
 
         address proxyAdmin = _proxyAdminOf(proxy);
         require(proxyAdmin != address(0), "UpgradeBase: proxy admin not found (is this a transparent proxy?)");
 
-        upgradeCalldata = abi.encodeCall(
+        bytes memory upgradeCalldata = abi.encodeCall(
             ProxyAdmin.upgradeAndCall,
             (ITransparentUpgradeableProxy(proxy), newImplementation, reinitializeData)
         );
 
-        _logPlan(label, proxy, proxyAdmin, newImplementation, upgradeCalldata);
+        if (vm.envOr("EXECUTE_UPGRADE", false)) {
+            ProxyAdmin(proxyAdmin).upgradeAndCall(
+                ITransparentUpgradeableProxy(proxy),
+                newImplementation,
+                reinitializeData
+            );
+            _logExecuted(label, proxy, proxyAdmin, newImplementation);
+        } else {
+            _logCalldata(label, proxy, proxyAdmin, newImplementation, upgradeCalldata);
+        }
     }
 
-    function _logPlan(
+    function _logExecuted(
+        string memory label,
+        address proxy,
+        address proxyAdmin,
+        address newImplementation
+    ) private view {
+        console.log("==================================================================");
+        console.log("Upgrade EXECUTED for:   %s", label);
+        console.log("Proxy:                  %s", proxy);
+        console.log("ProxyAdmin:             %s", proxyAdmin);
+        console.log("New implementation:     %s", newImplementation);
+        console.log("Implementation now:     %s", _implementationOf(proxy));
+        console.log("==================================================================");
+    }
+
+    function _logCalldata(
         string memory label,
         address proxy,
         address proxyAdmin,

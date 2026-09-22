@@ -2,13 +2,15 @@
 pragma solidity ^0.8.28;
 
 import {DeployBase} from "./DeployBase.s.sol";
-import {MorphoVault} from "contracts/morpho/MorphoVault.sol";
+import {AaveV3SupplyWithMerkle} from "contracts/aave-v3/AaveV3SupplyWithMerkle.sol";
+import {IAaveV3Supply} from "contracts/interfaces/IAaveV3Supply.sol";
 
-contract DeployMorphoVaultPyUsd is DeployBase {
-    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN_ROLE");
-    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER_ROLE");
-    address public merkleDistributor = vm.envAddress("MORPHO_MERKLE_DISTRIBUTOR");
-    address public morphoVault = vm.envAddress("MORPHO_VAULT_PYUSD");
+contract DeployAaveSupplyWithMerkle is DeployBase {
+    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN");
+    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER");
+    address public pool = vm.envAddress("AAVE_V3_POOL");
+    address public reserveAsset = vm.envAddress("AAVE_RESERVE_ASSET");
+    address public merkleDistributor = vm.envAddress("AAVE_MERKLE_DISTRIBUTOR");
     address public strategyContainer = vm.envAddress("STRATEGY_CONTAINER");
 
     uint256 public constant ENTER_MAX_SLIPPAGE = 5e16; // 5%
@@ -18,24 +20,26 @@ contract DeployMorphoVaultPyUsd is DeployBase {
     function run() public {
         _readRolesFromEnv();
 
-        address[] memory rewardTokens = new address[](0);
+        // Optional, comma-separated list of reward tokens. Defaults to none.
+        address[] memory rewardTokens = vm.envOr("AAVE_REWARD_TOKENS", ",", new address[](0));
 
-        MorphoVault.SlippageParams memory slippageParams = MorphoVault.SlippageParams({
+        IAaveV3Supply.SlippageParams memory slippageParams = IAaveV3Supply.SlippageParams({
             enterMaxSlippage: ENTER_MAX_SLIPPAGE,
             exitMaxSlippage: EXIT_MAX_SLIPPAGE,
             emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
         });
 
         vm.startBroadcast();
-        address implementation = address(new MorphoVault());
+        address implementation = address(new AaveV3SupplyWithMerkle());
         address proxy = _proxifyWithSalt(
             implementation,
             abi.encodeWithSelector(
-                MorphoVault.initialize.selector,
+                AaveV3SupplyWithMerkle.initialize.selector,
                 strategyContainer,
                 defaultAdmin,
                 merkleClaimer,
-                morphoVault,
+                pool,
+                reserveAsset,
                 merkleDistributor,
                 rewardTokens,
                 slippageParams

@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {DeployBase} from "./DeployBase.s.sol";
 import {AaveV3Supply} from "contracts/aave-v3/AaveV3Supply.sol";
+import {IAaveV3Supply} from "contracts/interfaces/IAaveV3Supply.sol";
 
 contract DeployAaveSupply is DeployBase {
     address public pool = vm.envAddress("AAVE_V3_POOL");
@@ -16,7 +17,7 @@ contract DeployAaveSupply is DeployBase {
     function run() public {
         _readRolesFromEnv();
 
-        AaveV3Supply.SlippageParams memory slippageParams = AaveV3Supply.SlippageParams({
+        IAaveV3Supply.SlippageParams memory slippageParams = IAaveV3Supply.SlippageParams({
             enterMaxSlippage: ENTER_MAX_SLIPPAGE,
             exitMaxSlippage: EXIT_MAX_SLIPPAGE,
             emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
@@ -27,11 +28,7 @@ contract DeployAaveSupply is DeployBase {
         address proxy = _proxifyWithSalt(
             implementation,
             abi.encodeWithSelector(
-                AaveV3Supply.initialize.selector,
-                strategyContainer,
-                pool,
-                reserveAsset,
-                slippageParams
+                AaveV3Supply.initialize.selector, strategyContainer, pool, reserveAsset, slippageParams
             )
         );
         vm.stopBroadcast();

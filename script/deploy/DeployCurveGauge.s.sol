@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {CurveGauge} from "contracts/curve-gauge/CurveGauge.sol";
 import {DeployBase} from "./DeployBase.s.sol";
 
-contract DeployCurveGaugePyusdUsdc is DeployBase {
+contract DeployCurveGauge is DeployBase {
     address public strategyContainer;
     address public curveGauge;
     uint256 public constant ENTER_MAX_SLIPPAGE = 5e16; // 5%
@@ -15,7 +15,7 @@ contract DeployCurveGaugePyusdUsdc is DeployBase {
         _readRolesFromEnv();
 
         strategyContainer = vm.envAddress("STRATEGY_CONTAINER");
-        curveGauge = vm.envAddress("CURVE_GAUGE_PYUSD_USDC");
+        curveGauge = vm.envAddress("CURVE_GAUGE");
 
         vm.startBroadcast();
         address implementation = address(new CurveGauge());
