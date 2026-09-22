@@ -127,11 +127,6 @@ contract AaveV3Supply is StrategyTemplate, IAaveV3Supply {
         }
     }
 
-    /// @dev No-op on a zero balance rather than reverting, matching `FluidSupply`/`MorphoVault`: entering
-    ///      with nothing new to deposit is routine (e.g. a state re-affirmation with no incoming funds, or
-    ///      a subclass reinvesting a reward/claim that happened to swap to nothing), not an error, and
-    ///      must not block the container. `internal` so a subclass can reuse it directly as its own
-    ///      reinvest-into-Aave step.
     function _enterAaveReserveSupplied() internal {
         address reserveAssetCached = reserveAsset;
         uint256 underlyingAssetBalance = IERC20(reserveAssetCached).balanceOf(address(this));
@@ -185,8 +180,6 @@ contract AaveV3Supply is StrategyTemplate, IAaveV3Supply {
         }
 
         vars.income = vars.currentReserveATokenBalance - vars.lastReserveATokenBalanceCached;
-        // Capped to the actual balance so a rounding edge case can never make the fee transfer revert -
-        // harvest runs ahead of every enter/exit and must not be able to block the container.
         vars.fee = Math.min(vars.income.mulDiv(feePct, MAX_BPS), vars.currentReserveATokenBalance);
 
         if (vars.fee > 0) {
