@@ -5,8 +5,8 @@ import {DeployBase} from "./DeployBase.s.sol";
 import {MorphoVault} from "contracts/morpho/MorphoVault.sol";
 
 contract DeployMorphoVault is DeployBase {
-    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN_ROLE");
-    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER_ROLE");
+    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN");
+    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER");
     address public merkleDistributor = vm.envAddress("MORPHO_MERKLE_DISTRIBUTOR");
     address public morphoVault = vm.envAddress("MORPHO_VAULT");
     address public strategyContainer = vm.envAddress("STRATEGY_CONTAINER");

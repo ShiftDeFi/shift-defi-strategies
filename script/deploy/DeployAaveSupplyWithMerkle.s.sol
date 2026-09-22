@@ -6,8 +6,8 @@ import {AaveV3SupplyWithMerkle} from "contracts/aave-v3/AaveV3SupplyWithMerkle.s
 import {IAaveV3Supply} from "contracts/interfaces/IAaveV3Supply.sol";
 
 contract DeployAaveSupplyWithMerkle is DeployBase {
-    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN_ROLE");
-    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER_ROLE");
+    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN");
+    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER");
     address public pool = vm.envAddress("AAVE_V3_POOL");
     address public reserveAsset = vm.envAddress("AAVE_RESERVE_ASSET");
     address public merkleDistributor = vm.envAddress("AAVE_MERKLE_DISTRIBUTOR");
