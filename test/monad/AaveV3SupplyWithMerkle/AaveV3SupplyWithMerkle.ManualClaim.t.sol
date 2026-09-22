@@ -41,11 +41,8 @@ contract AaveV3SupplyWithMerkleManualClaimTest is AaveV3SupplyWithMerkleBase {
         uint256 treasuryBalanceBefore = IERC20(A_MON_USDC).balanceOf(treasury);
 
         vm.prank(roles.merkleClaimer);
-        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy)).manualClaim(
-            _singleton(USDC),
-            _singleton(claimAmount),
-            _emptyProofs()
-        );
+        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy))
+            .manualClaim(_singleton(USDC), _singleton(claimAmount), _emptyProofs());
 
         assertEq(
             IERC20(USDC).balanceOf(address(aaveSupplyStrategy)),
@@ -77,11 +74,8 @@ contract AaveV3SupplyWithMerkleManualClaimTest is AaveV3SupplyWithMerkleBase {
         deal(WMON, address(mockDistributor), claimAmount, false);
 
         vm.prank(roles.merkleClaimer);
-        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy)).manualClaim(
-            _singleton(WMON),
-            _singleton(claimAmount),
-            _emptyProofs()
-        );
+        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy))
+            .manualClaim(_singleton(WMON), _singleton(claimAmount), _emptyProofs());
 
         assertEq(
             IERC20(WMON).balanceOf(address(aaveSupplyStrategy)),
@@ -106,18 +100,65 @@ contract AaveV3SupplyWithMerkleManualClaimTest is AaveV3SupplyWithMerkleBase {
         );
     }
 
+    function test_ManualClaim_ClaimsWithoutReinvestingWhenNotSupplied() public {
+        _enterStrategy();
+
+        // A full-share emergency exit lands directly in `UNDERLYING_ASSET_STATE_ID` with NAV resolution
+        // mode off again (`_acceptNav` runs inline for `share == MAX_BPS`), unlike the partial exit in
+        // `testRevert_ManualClaim_NavResolutionModeActivated` below - exactly the "not supplied, but
+        // otherwise normal" state this test needs.
+        uint256 aaveNavBeforeExit = aaveSupplyStrategy.stateNav(AAVE_RESERVE_SUPPLIED_STATE_ID);
+        vm.prank(roles.emergencyExecutor);
+        aaveSupplyStrategy.emergencyExit(UNDERLYING_ASSET_STATE_ID, MAX_BPS, aaveNavBeforeExit);
+
+        assertFalse(
+            aaveSupplyStrategy.isNavResolutionMode(),
+            "test_ManualClaim_ClaimsWithoutReinvestingWhenNotSupplied: full emergency exit left NAV resolution mode on"
+        );
+        assertEq(
+            aaveSupplyStrategy.currentStateId(),
+            UNDERLYING_ASSET_STATE_ID,
+            "test_ManualClaim_ClaimsWithoutReinvestingWhenNotSupplied: strategy did not fully exit Aave"
+        );
+
+        uint256 usdcBalanceBeforeClaim = IERC20(USDC).balanceOf(address(aaveSupplyStrategy));
+        uint256 treasuryATokenBalanceBefore = IERC20(A_MON_USDC).balanceOf(treasury);
+
+        uint256 claimAmount = 10_000 * 10 ** uint256(IERC20Metadata(USDC).decimals());
+        deal(USDC, address(mockDistributor), claimAmount, true);
+
+        vm.prank(roles.merkleClaimer);
+        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy))
+            .manualClaim(_singleton(USDC), _singleton(claimAmount), _emptyProofs());
+
+        assertEq(
+            IERC20(USDC).balanceOf(address(aaveSupplyStrategy)),
+            usdcBalanceBeforeClaim + claimAmount,
+            "test_ManualClaim_ClaimsWithoutReinvestingWhenNotSupplied: claimed USDC not credited to strategy"
+        );
+        assertEq(
+            aaveSupplyStrategy.stateNav(AAVE_RESERVE_SUPPLIED_STATE_ID),
+            0,
+            "test_ManualClaim_ClaimsWithoutReinvestingWhenNotSupplied: claim was reinvested into Aave while not supplied"
+        );
+        assertEq(
+            IERC20(A_MON_USDC).balanceOf(treasury),
+            treasuryATokenBalanceBefore,
+            "test_ManualClaim_ClaimsWithoutReinvestingWhenNotSupplied: fee taken while not supplied"
+        );
+    }
+
     function testRevert_ManualClaim_Unauthorized() public {
         _enterStrategy();
 
         vm.startPrank(users.alice);
         vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, users.alice, MERKLE_CLAIMER_ROLE)
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, users.alice, MERKLE_CLAIMER_ROLE
+            )
         );
-        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy)).manualClaim(
-            _singleton(USDC),
-            _singleton(1),
-            _emptyProofs()
-        );
+        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy))
+            .manualClaim(_singleton(USDC), _singleton(1), _emptyProofs());
         vm.stopPrank();
     }
 
@@ -127,10 +168,8 @@ contract AaveV3SupplyWithMerkleManualClaimTest is AaveV3SupplyWithMerkleBase {
         uint256 partialShare = MAX_BPS / 2;
         // `emergencyExit`'s third argument is `minNavDelta`, a lower bound the resulting target-state
         // NAV must clear - kept a tiny epsilon below the exact half so Aave's rounding can't trip it.
-        uint256 minNavDelta = aaveSupplyStrategy.stateNav(AAVE_RESERVE_SUPPLIED_STATE_ID).mulDiv(
-            partialShare - ONE_PCT / 100,
-            MAX_BPS
-        );
+        uint256 minNavDelta =
+            aaveSupplyStrategy.stateNav(AAVE_RESERVE_SUPPLIED_STATE_ID).mulDiv(partialShare - ONE_PCT / 100, MAX_BPS);
 
         vm.prank(roles.emergencyExecutor);
         aaveSupplyStrategy.emergencyExit(UNDERLYING_ASSET_STATE_ID, partialShare, minNavDelta);
@@ -142,11 +181,8 @@ contract AaveV3SupplyWithMerkleManualClaimTest is AaveV3SupplyWithMerkleBase {
 
         vm.prank(roles.merkleClaimer);
         vm.expectRevert(IStrategyTemplate.NavResolutionModeActivated.selector);
-        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy)).manualClaim(
-            _singleton(USDC),
-            _singleton(1),
-            _emptyProofs()
-        );
+        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy))
+            .manualClaim(_singleton(USDC), _singleton(1), _emptyProofs());
     }
 
     function _singleton(address token) private pure returns (address[] memory tokens) {

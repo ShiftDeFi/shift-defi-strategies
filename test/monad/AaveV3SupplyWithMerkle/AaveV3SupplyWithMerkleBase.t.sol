@@ -27,12 +27,11 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
     uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
     uint256 internal constant EMERGENCY_EXIT_MAX_SLIPPAGE = 5e16; // 5%
 
-    AaveV3Supply.SlippageParams internal SLIPPAGE_PARAMS =
-        AaveV3Supply.SlippageParams({
-            enterMaxSlippage: ENTER_MAX_SLIPPAGE,
-            exitMaxSlippage: EXIT_MAX_SLIPPAGE,
-            emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
-        });
+    AaveV3Supply.SlippageParams internal SLIPPAGE_PARAMS = AaveV3Supply.SlippageParams({
+        enterMaxSlippage: ENTER_MAX_SLIPPAGE,
+        exitMaxSlippage: EXIT_MAX_SLIPPAGE,
+        emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
+    });
 
     bytes32 internal constant UNDERLYING_ASSET_STATE_ID = keccak256("UNDERLYING_ASSET_STATE_ID");
     bytes32 internal constant AAVE_RESERVE_SUPPLIED_STATE_ID = keccak256("AAVE_RESERVE_SUPPLIED_STATE_ID");
@@ -89,8 +88,9 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
         vm.startPrank(mockStrategyContainer);
         IERC20(USDC).forceApprove(address(aaveSupplyStrategy), type(uint256).max);
 
-        uint256 minNavDelta = (aaveSupplyStrategy.getTokenAmountInNotion(USDC, amounts[0]) *
-            (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT)) / MAX_BPS;
+        uint256 minNavDelta =
+            (aaveSupplyStrategy.getTokenAmountInNotion(USDC, amounts[0]) * (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT))
+                / MAX_BPS;
         aaveSupplyStrategy.enter(amounts, minNavDelta);
 
         vm.stopPrank();
@@ -120,11 +120,7 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
         vm.stopPrank();
 
         uint256 treasuryBalanceAfter = IERC20(A_MON_USDC).balanceOf(treasury);
-        assertGe(
-            treasuryBalanceAfter,
-            treasuryBalanceBefore,
-            "test_Harvest_LendingInterestOnly: no treasury rewards"
-        );
+        assertGe(treasuryBalanceAfter, treasuryBalanceBefore, "test_Harvest_LendingInterestOnly: no treasury rewards");
     }
 
     /// @dev Exercises the real WMON -> USDC predefined swap registered in `MonadContext` against the
@@ -218,10 +214,7 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
 
         uint256 underlyingAssetNav = aaveSupplyStrategy.stateNav(UNDERLYING_ASSET_STATE_ID);
         assertApproxEqRel(
-            underlyingAssetNav,
-            aaveNavBefore,
-            NAV_TOLERANCE_PCT,
-            "test_ExitTarget_Full: Underlying Asset NAV"
+            underlyingAssetNav, aaveNavBefore, NAV_TOLERANCE_PCT, "test_ExitTarget_Full: Underlying Asset NAV"
         );
 
         uint256 exitedAmount = IERC20(USDC).balanceOf(address(aaveSupplyStrategy));
