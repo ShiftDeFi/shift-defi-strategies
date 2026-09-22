@@ -6,8 +6,8 @@ import {FluidSupply} from "contracts/fluid/FluidSupply.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract DeployFluidSupplyUsdt is DeployBase {
-    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN_ROLE");
-    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER_ROLE");
+    address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN");
+    address public merkleClaimer = vm.envAddress("MERKLE_CLAIMER");
     address public merkleDistributor = vm.envAddress("FLUID_MERKLE_DISTRIBUTOR");
     address public fToken = vm.envAddress("F_TOKEN_USDT");
     address public strategyContainer = vm.envAddress("STRATEGY_CONTAINER");
