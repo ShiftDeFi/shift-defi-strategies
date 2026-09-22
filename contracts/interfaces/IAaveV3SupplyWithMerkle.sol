@@ -7,15 +7,18 @@ interface IAaveV3SupplyWithMerkle {
     struct AutomaticHarvestLocalVars {
         address reserveAssetCached;
         address reserveATokenCached;
-        uint256 rewardTokensLength;
+        uint256 aTokenBalanceBefore;
+        uint256 aTokenDelta;
         uint256 balanceBeforeReinvest;
         uint256 currentBalance;
-        uint256 fee;
+        uint256 feeToTreasury;
+        uint256 feeFromReinvest;
     }
 
     struct ManualClaimLocalVars {
         address reserveATokenCached;
         address strategyContainerCached;
+        address reserveAssetCached;
         address treasury;
         uint256 feePct;
         uint256 lastBalanceCached;

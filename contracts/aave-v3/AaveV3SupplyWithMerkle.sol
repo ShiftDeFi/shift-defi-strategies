@@ -95,40 +95,36 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
         vars.reserveATokenCached = reserveAToken;
         vars.reserveAssetCached = reserveAsset;
         vars.balanceBeforeReinvest = lastReserveATokenBalance;
+        vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
+
+        if (vars.currentBalance > vars.balanceBeforeReinvest) {
+            vars.feeToTreasury = (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS);
+        }
+
+        if (stateId == AAVE_RESERVE_SUPPLIED_STATE_ID) {
+            for (uint256 i = 0; i < rewardTokens.length; ++i) {
+               _swapToInputTokens(rewardTokens[i], vars.reserveAssetCached, 0, false);
+            }
+            vars.aTokenBalanceBefore = IERC20(vars.reserveATokenCached).balanceOf(address(this));
+            _enterAaveReserveSupplied();
+            vars.aTokenDelta = IERC20(vars.reserveATokenCached).balanceOf(address(this)) - vars.aTokenBalanceBefore;
+            if (vars.aTokenDelta > 0) {
+                vars.feeFromReinvest = vars.aTokenDelta.mulDiv(feePct, MAX_BPS);
+                if (vars.feeFromReinvest > 0) {
+                    vars.feeToTreasury += vars.feeFromReinvest;
+                }
+            }
+        }
+
+        if (vars.feeToTreasury > 0) {
+            IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.feeToTreasury);
+        }
 
         vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
+
         if (vars.currentBalance > vars.balanceBeforeReinvest) {
-            vars.fee = (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS);
-            if (vars.fee > 0) {
-                IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
-            }
-            vars.balanceBeforeReinvest = vars.currentBalance - vars.fee;
+            lastReserveATokenBalance = vars.currentBalance;
         }
-
-        if (stateId != AAVE_RESERVE_SUPPLIED_STATE_ID) {
-            if (vars.balanceBeforeReinvest != lastReserveATokenBalance) {
-                lastReserveATokenBalance = vars.balanceBeforeReinvest;
-            }
-            return;
-        }
-
-        vars.rewardTokensLength = rewardTokens.length;
-        for (uint256 i = 0; i < vars.rewardTokensLength; ++i) {
-            _swapToInputTokens(rewardTokens[i], vars.reserveAssetCached, 0, false);
-        }
-        _enterAaveReserveSupplied();
-
-        vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
-        if (vars.currentBalance > vars.balanceBeforeReinvest) {
-            vars.fee = Math.min(
-                (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS), vars.currentBalance
-            );
-            if (vars.fee > 0) {
-                IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
-            }
-        }
-
-        lastReserveATokenBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
     }
 
     /// @inheritdoc IAaveV3SupplyWithMerkle
@@ -141,6 +137,7 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
 
         ManualClaimLocalVars memory vars;
         vars.reserveATokenCached = reserveAToken;
+        vars.reserveAssetCached = reserveAsset;
         vars.strategyContainerCached = _strategyContainer;
 
         vars.treasury = IStrategyContainer(vars.strategyContainerCached).treasury();
@@ -155,7 +152,7 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
         if (currentStateId() == AAVE_RESERVE_SUPPLIED_STATE_ID) {
             uint256 tokensLength = tokens.length;
             for (uint256 i = 0; i < tokensLength; ++i) {
-                if (tokens[i] == reserveAsset) {
+                if (tokens[i] == vars.reserveAssetCached) {
                     _enterAaveReserveSupplied();
                     break;
                 }
