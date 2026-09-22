@@ -102,8 +102,9 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
         }
 
         if (stateId == AAVE_RESERVE_SUPPLIED_STATE_ID) {
-            for (uint256 i = 0; i < rewardTokens.length; ++i) {
-               _swapToInputTokens(rewardTokens[i], vars.reserveAssetCached, 0, false);
+            vars.rewardTokensLength = rewardTokens.length;
+            for (uint256 i = 0; i < vars.rewardTokensLength; ++i) {
+                _swapToInputTokens(rewardTokens[i], vars.reserveAssetCached, 0, false);
             }
             vars.aTokenBalanceBefore = IERC20(vars.reserveATokenCached).balanceOf(address(this));
             _enterAaveReserveSupplied();
@@ -160,9 +161,7 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
 
             vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
             if (vars.currentBalance > vars.lastBalanceCached) {
-                vars.fee = Math.min(
-                    (vars.currentBalance - vars.lastBalanceCached).mulDiv(vars.feePct, MAX_BPS), vars.currentBalance
-                );
+                vars.fee = (vars.currentBalance - vars.lastBalanceCached).mulDiv(vars.feePct, MAX_BPS);
                 if (vars.fee > 0) {
                     IERC20(vars.reserveATokenCached).safeTransfer(vars.treasury, vars.fee);
                 }
