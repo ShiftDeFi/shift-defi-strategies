@@ -204,4 +204,6 @@ contract AaveV3Supply is StrategyTemplate, IAaveV3Supply {
         lastReserveATokenBalance = IERC20(reserveAToken).balanceOf(address(this));
         return withdrawnAmount;
     }
+
+    uint256[50] private __gap;
 }
