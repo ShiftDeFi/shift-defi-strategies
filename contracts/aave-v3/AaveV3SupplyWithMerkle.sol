@@ -101,7 +101,6 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAave
         vars.reserveAssetCached = reserveAsset;
         vars.reserveATokenCached = reserveAToken;
         vars.rewardTokensLength = rewardTokens.length;
-        // `super._harvest` just set this to the exact post-fee-transfer balance.
         vars.balanceBeforeReinvest = lastReserveATokenBalance;
 
         for (uint256 i = 0; i < vars.rewardTokensLength; ++i) {
