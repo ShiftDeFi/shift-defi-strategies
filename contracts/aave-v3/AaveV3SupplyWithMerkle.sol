@@ -98,9 +98,7 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
 
         vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
         if (vars.currentBalance > vars.balanceBeforeReinvest) {
-            vars.fee = Math.min(
-                (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS), vars.currentBalance
-            );
+            vars.fee = (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS);
             if (vars.fee > 0) {
                 IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
             }

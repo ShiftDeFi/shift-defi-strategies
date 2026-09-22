@@ -41,7 +41,7 @@ contract AaveV3Supply is AaveV3SupplyBase {
         }
 
         vars.income = vars.currentReserveATokenBalance - vars.lastReserveATokenBalanceCached;
-        vars.fee = Math.min(vars.income.mulDiv(feePct, MAX_BPS), vars.currentReserveATokenBalance);
+        vars.fee = vars.income.mulDiv(feePct, MAX_BPS);
 
         if (vars.fee > 0) {
             IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
