@@ -9,11 +9,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IStrategyContainer} from "@shift-defi/core/interfaces/IStrategyContainer.sol";
 import {Errors} from "@shift-defi/core/libraries/Errors.sol";
 
-import {AaveV3Supply} from "./AaveV3Supply.sol";
+import {AaveV3SupplyBase} from "./AaveV3SupplyBase.sol";
 import {IAngleMerkleDistributor} from "../dependencies/angle/IAngleMerkleDistributor.sol";
 import {IAaveV3SupplyWithMerkle} from "../interfaces/IAaveV3SupplyWithMerkle.sol";
 
-contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAaveV3SupplyWithMerkle {
+contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, IAaveV3SupplyWithMerkle {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -31,7 +31,7 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAave
     }
 
     /// @notice Initializes the AaveV3SupplyWithMerkle strategy contract
-    /// @dev Composes `AaveV3Supply`'s initializer with the Merkle claim setup inside one
+    /// @dev Composes `AaveV3SupplyBase`'s initializer with the Merkle claim setup inside one
     ///      `initializer`-guarded call
     /// @param strategyContainer The address of the strategy container contract
     /// @param defaultAdmin The address of the default admin
@@ -91,32 +91,43 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3Supply, IAave
     }
 
     function _harvest(bytes32 stateId, address treasury, uint256 feePct) internal override {
-        super._harvest(stateId, treasury, feePct);
+        AutomaticHarvestLocalVars memory vars;
+        vars.reserveATokenCached = reserveAToken;
+        vars.reserveAssetCached = reserveAsset;
+        vars.balanceBeforeReinvest = lastReserveATokenBalance;
+
+        vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
+        if (vars.currentBalance > vars.balanceBeforeReinvest) {
+            vars.fee = Math.min(
+                (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS), vars.currentBalance
+            );
+            if (vars.fee > 0) {
+                IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
+            }
+            vars.balanceBeforeReinvest = vars.currentBalance - vars.fee;
+        }
 
         if (stateId != AAVE_RESERVE_SUPPLIED_STATE_ID) {
+            if (vars.balanceBeforeReinvest != lastReserveATokenBalance) {
+                lastReserveATokenBalance = vars.balanceBeforeReinvest;
+            }
             return;
         }
 
-        AutomaticHarvestLocalVars memory vars;
-        vars.reserveAssetCached = reserveAsset;
-        vars.reserveATokenCached = reserveAToken;
         vars.rewardTokensLength = rewardTokens.length;
-        vars.balanceBeforeReinvest = lastReserveATokenBalance;
-
         for (uint256 i = 0; i < vars.rewardTokensLength; ++i) {
             _swapToInputTokens(rewardTokens[i], vars.reserveAssetCached, 0, false);
         }
         _enterAaveReserveSupplied();
 
         vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
-        if (vars.currentBalance <= vars.balanceBeforeReinvest) {
-            return;
-        }
-
-        vars.fee =
-            Math.min((vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS), vars.currentBalance);
-        if (vars.fee > 0) {
-            IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
+        if (vars.currentBalance > vars.balanceBeforeReinvest) {
+            vars.fee = Math.min(
+                (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS), vars.currentBalance
+            );
+            if (vars.fee > 0) {
+                IERC20(vars.reserveATokenCached).safeTransfer(treasury, vars.fee);
+            }
         }
 
         lastReserveATokenBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));

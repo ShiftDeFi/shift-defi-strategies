@@ -4,6 +4,12 @@ pragma solidity ^0.8.28;
 interface IAaveV3Supply {
     // ---- Structs ----
 
+    struct SlippageParams {
+        uint256 enterMaxSlippage;
+        uint256 exitMaxSlippage;
+        uint256 emergencyExitMaxSlippage;
+    }
+
     struct AaveHarvestLocalVars {
         address reserveATokenCached;
         uint256 lastReserveATokenBalanceCached;

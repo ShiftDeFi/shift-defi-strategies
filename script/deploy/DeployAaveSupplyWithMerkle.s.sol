@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {DeployBase} from "./DeployBase.s.sol";
-import {AaveV3Supply} from "contracts/aave-v3/AaveV3Supply.sol";
 import {AaveV3SupplyWithMerkle} from "contracts/aave-v3/AaveV3SupplyWithMerkle.sol";
+import {IAaveV3Supply} from "contracts/interfaces/IAaveV3Supply.sol";
 
 contract DeployAaveSupplyWithMerkle is DeployBase {
     address public defaultAdmin = vm.envAddress("DEFAULT_ADMIN_ROLE");
@@ -23,7 +23,7 @@ contract DeployAaveSupplyWithMerkle is DeployBase {
         // Optional, comma-separated list of reward tokens. Defaults to none.
         address[] memory rewardTokens = vm.envOr("AAVE_REWARD_TOKENS", ",", new address[](0));
 
-        AaveV3Supply.SlippageParams memory slippageParams = AaveV3Supply.SlippageParams({
+        IAaveV3Supply.SlippageParams memory slippageParams = IAaveV3Supply.SlippageParams({
             enterMaxSlippage: ENTER_MAX_SLIPPAGE,
             exitMaxSlippage: EXIT_MAX_SLIPPAGE,
             emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE

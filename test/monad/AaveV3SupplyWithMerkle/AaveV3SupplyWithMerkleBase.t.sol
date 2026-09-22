@@ -9,8 +9,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
 import {Common} from "@shift-defi/core/libraries/Common.sol";
 
-import {AaveV3Supply} from "contracts/aave-v3/AaveV3Supply.sol";
 import {AaveV3SupplyWithMerkle} from "contracts/aave-v3/AaveV3SupplyWithMerkle.sol";
+import {IAaveV3Supply} from "contracts/interfaces/IAaveV3Supply.sol";
 
 import {MonadContext} from "test/monad/MonadContext.t.sol";
 
@@ -27,7 +27,7 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
     uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
     uint256 internal constant EMERGENCY_EXIT_MAX_SLIPPAGE = 5e16; // 5%
 
-    AaveV3Supply.SlippageParams internal SLIPPAGE_PARAMS = AaveV3Supply.SlippageParams({
+    IAaveV3Supply.SlippageParams internal SLIPPAGE_PARAMS = IAaveV3Supply.SlippageParams({
         enterMaxSlippage: ENTER_MAX_SLIPPAGE,
         exitMaxSlippage: EXIT_MAX_SLIPPAGE,
         emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
