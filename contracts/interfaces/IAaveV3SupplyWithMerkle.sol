@@ -32,7 +32,6 @@ interface IAaveV3SupplyWithMerkle {
 
     error RewardTokenMatchesReserveAsset();
     error RewardTokenMatchesReserveAToken();
-    error NotInAaveSuppliedState();
 
     // ---- Functions ----
 
@@ -45,8 +44,9 @@ interface IAaveV3SupplyWithMerkle {
     function setRewardTokens(address[] memory _rewardTokens) external;
 
     /// @notice Manually claims the rewards. Only callable by role MERKLE_CLAIMER_ROLE
-    /// @dev Only the container's notion token is reinvested instantly; any other claimed reward (e.g.
-    ///      WMON) is left on the contract and reinvested by the next automatic harvest instead
+    /// @dev Only the reserve asset is reinvested instantly, and only while currently supplied to Aave;
+    ///      any other claimed reward (e.g. WMON), and any claim made while not supplied, is left on the
+    ///      contract and reinvested by the next automatic harvest instead
     /// @param tokens The addresses of the tokens
     /// @param amounts The amounts of the tokens
     /// @param proofs The proofs of the merkle proofs
