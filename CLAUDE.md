@@ -39,70 +39,16 @@ forge script script/upgrade/UpgradeMorphoVault.s.sol --rpc-url ethereum --broadc
 the `ProxyAdmin.upgradeAndCall` calldata for the multisig. Set `EXECUTE_UPGRADE=true` only when the
 broadcasting EOA owns the proxy's `ProxyAdmin`.
 
-`tools/merkl-claim.mjs` (node ≥ 18, no npm deps, shells out to `cast`) builds the
-`MorphoVault.manualClaim` calldata for the Safe UI from the Merkl rewards API — one transaction per
-reward token, since `manualClaim` hardcodes a single-element `users` array and the Angle distributor
-requires `users.length == tokens.length`:
+`tools/merkl-claim.mjs` builds `MorphoVault.manualClaim` calldata from the Merkl API and, with
+`--propose`, queues it on the claimer Safe. Run it through `npm run claim` / `npm run claim:propose`,
+which source `tools/merkl-claim.env`, its only config (gitignored, values must be quoted; the template
+is `tools/merkl-claim.env.example`). Usage and internals are in `tools/README.md`. Two design choices
+not to undo:
 
-Run it through the npm scripts, which `source` its config first — the script itself reads nothing
-off disk:
-
-```shell
-npm run claim                                  # every strategy + on-chain pre-flight checks
-npm run claim -- pyusd --safe-batch c.json     # flags for the script go after `--`
-```
-
-`tools/merkl-claim.env` is the tool's **only** config file — one `MERKL_STRATEGY_<ALIAS>=0x…` per
-strategy (plus an optional `_LABEL`), `MERKL_CLAIM_SAFE`, `MERKL_CLAIM_RPC_URL` and
-`SAFE_PROPOSER_ACCOUNT`, `MERKL_CLAIM_MULTISEND`. Nothing is hardcoded in the script and the repo-wide `.env` is deliberately
-not involved, so the tool stands alone. It is gitignored by the existing `**/*.env` rule;
-`tools/merkl-claim.env.example` is the committed template. It is sourced by `sh`, so **keep the
-values quoted** — an unquoted `_LABEL` with a space in it is a shell syntax error, not a config bug.
-An exported `$ETH_RPC_URL` stands in for an unset `MERKL_CLAIM_RPC_URL`. Note that `source` assigns
-unconditionally, so the file wins over anything already in your environment — override on the command
-line, not with an env var. A raw `0x` address as the strategy argument works with no config at all.
-
-With `--propose` it skips the Safe UI entirely: it signs each claim and queues it on the Safe
-transaction service (`https://api.safe.global/tx-service/<eip3770>/api/v1`), where the owners confirm
-it as usual. The signing key only needs to be a **delegate** of the claimer Safe — delegates can
-queue transactions but cannot confirm or execute them, so no key that can move funds is involved.
-`--dry-run` signs and prints the payload without submitting.
-
-**All the claims go in one transaction**, delegatecalled through `MultiSendCallOnly`
-(`$MERKL_CLAIM_MULTISEND`, version-matched to the Safe), on a single nonce one past whatever the Safe
-already has queued. That is deliberate and the failure semantics follow from it: **if any claim fails
-pre-flight, nothing is queued at all.** A partial claim is not a useful outcome — one strategy that
-cannot claim is a thing to investigate, not a reason to push the others through — and since every
-strategy claims from the same Angle distributor against the same global Merkle root, the legs go
-stale together anyway, so isolating them buys nothing. Batching also means one nonce rather than a
-chain of coupled ones: Safe nonces are strictly sequential, so separate proposals strand each other
-if the owners skip one. `--force` queues a batch despite a failed check; `--no-batch` falls back to
-one proposal per claim on consecutive nonces, where a failing claim is skipped instead of fatal.
-
-Inner calls come from the Safe itself (that is what the delegatecall into `MultiSendCallOnly` buys),
-so each strategy still sees `msg.sender` holding `MERKLE_CLAIMER_ROLE`.
-
-```shell
-npm run claim:propose -- --dry-run             # show the batch, submit nothing
-npm run claim:propose                          # one batched tx, signed by $SAFE_PROPOSER_ACCOUNT
-npm run claim:propose -- --no-batch            # one transaction per claim instead
-npm run claim:propose -- pyusd --account shift-dev   # a different `cast wallet` keystore
-```
-
-The signer is a **`cast wallet` keystore account** — `--account <name>`, or `$SAFE_PROPOSER_ACCOUNT`
-in `tools/merkl-claim.env` so `--propose` needs no flags. The key stays encrypted at rest and is never handled by the
-script: it splices `--account` into `cast wallet sign` and `cast` does the rest, prompting for the
-password on the terminal (`castInteractive` keeps stdin/stderr attached for exactly that).
-`$SAFE_PROPOSER_PASSWORD_FILE` unlocks it unattended for CI. `--ledger` signs on device instead, and
-`$SAFE_PROPOSER_PRIVATE_KEY` is a last-resort fallback that puts the key in the `cast` child's argv —
-avoid it. Set up an account with `cast wallet import <name> --interactive`; `cast wallet list` names
-them and `cast wallet address --account <name>` reveals which address one holds (Foundry keystores do
-not store the address in plaintext).
-
-The Safe address comes from `--safe` or `$MERKL_CLAIM_SAFE`. `$SAFE_API_KEY`
-(developer.safe.global) lifts the transaction service's unauthenticated 2 RPS / 5k-per-month limit.
-The proposal digest is read off the Safe's own `getTransactionHash`, and the signature is checked back
-through the ecrecover precompile before it is submitted.
+- Claims are batched into **one all-or-nothing transaction** via `MultiSendCallOnly`: if any claim fails
+  pre-flight, nothing is queued. A partial claim is deliberately not an outcome.
+- The proposing key is a **delegate-only** `cast wallet` keystore account, never an owner key, and the
+  script never handles the key itself.
 
 Commits go through commitlint (conventional, `feat|fix|docs|chore|style|refactor|test|wip`, header ≤ 72
 chars, non-empty body with lines ≤ 72 chars) and a pre-commit hook that runs prettier + the fork tests.
