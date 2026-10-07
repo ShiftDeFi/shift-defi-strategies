@@ -37,6 +37,9 @@ abstract contract AaveV3SupplyBase is StrategyTemplate, IAaveV3Supply {
     /// @notice State ID for the Aave reserve supplied state (asset supplied to Aave)
     bytes32 internal constant AAVE_RESERVE_SUPPLIED_STATE_ID = keccak256("AAVE_RESERVE_SUPPLIED_STATE_ID");
 
+    /// @notice Aave's ray precision, the unit of the reserve liquidity index
+    uint256 internal constant RAY = 1e27;
+
     /// @dev Shared initializer logic, exposed so subclasses can compose it with their own additional setup
     ///      inside a single `initializer`-guarded call.
     function __AaveV3Supply_init(
@@ -114,6 +117,13 @@ abstract contract AaveV3SupplyBase is StrategyTemplate, IAaveV3Supply {
         }
 
         address poolCached = pool;
+
+        // Aave reverts a supply that mints zero scaled aTokens (amount * RAY / liquidityIndex rounds down to 0).
+        // Leave such dust idle for a later supply so it can't be used to make harvest revert.
+        if (underlyingAssetBalance.mulDiv(RAY, IPool(poolCached).getReserveNormalizedIncome(reserveAssetCached)) == 0) {
+            return;
+        }
+
         IERC20(reserveAssetCached).safeIncreaseAllowance(poolCached, underlyingAssetBalance);
         IPool(poolCached).supply(reserveAssetCached, underlyingAssetBalance, address(this), 0);
         lastReserveATokenBalance = IERC20(reserveAToken).balanceOf(address(this));

@@ -10,6 +10,7 @@ import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.s
 import {Common} from "@shift-defi/core/libraries/Common.sol";
 
 import {AaveV3SupplyWithMerkle} from "contracts/aave-v3/AaveV3SupplyWithMerkle.sol";
+import {IPool} from "contracts/dependencies/aave-v3/IPool.sol";
 import {IAaveV3Supply} from "contracts/interfaces/IAaveV3Supply.sol";
 
 import {MonadContext} from "test/monad/MonadContext.t.sol";
@@ -22,6 +23,7 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
 
     uint256 internal constant ENTER_AMOUNT = 100_000;
     uint256 internal constant NAV_TOLERANCE_PCT = 2e14; // 0.02%
+    uint256 internal constant RAY = 1e27;
 
     uint256 internal constant ENTER_MAX_SLIPPAGE = 5e16; // 5%
     uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
@@ -159,6 +161,51 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
             treasuryBalanceBefore,
             "test_Harvest_SwapsAndReinvestsRewardToken: no performance fee taken on reinvested reward"
         );
+    }
+
+    /// @dev 1 wei of USDC mints zero scaled aTokens at the current liquidity index, which Aave rejects. Harvest
+    ///      must leave such dust idle instead of reverting, or anyone could stall the container's enter/exit.
+    function test_Harvest_LeavesDustThatMintsZeroScaledATokens() public {
+        _enterStrategy();
+
+        assertGt(
+            IPool(AAVE_V3_POOL).getReserveNormalizedIncome(USDC),
+            RAY,
+            "test_Harvest_LeavesDustThatMintsZeroScaledATokens: 1 wei would mint a scaled aToken"
+        );
+
+        deal(USDC, address(aaveSupplyStrategy), 1, true);
+
+        vm.prank(mockStrategyContainer);
+        aaveSupplyStrategy.harvest();
+
+        assertEq(
+            IERC20(USDC).balanceOf(address(aaveSupplyStrategy)),
+            1,
+            "test_Harvest_LeavesDustThatMintsZeroScaledATokens: dust not left idle"
+        );
+    }
+
+    /// @dev The dust guard in `_enterAaveReserveSupplied` must not let a dust-only enter pass silently: the supply
+    ///      is skipped, so the supplied-state NAV does not move and the template's slippage check rejects it.
+    function testRevert_Enter_DustMintsZeroScaledATokens() public {
+        _enterStrategy();
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1;
+        deal(USDC, mockStrategyContainer, amounts[0], true);
+
+        uint256 minNavDelta =
+            (aaveSupplyStrategy.getTokenAmountInNotion(USDC, amounts[0]) * (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT))
+                / MAX_BPS;
+        uint256 navBefore = aaveSupplyStrategy.stateNav(AAVE_RESERVE_SUPPLIED_STATE_ID);
+
+        vm.startPrank(mockStrategyContainer);
+        vm.expectRevert(
+            abi.encodeWithSelector(IStrategyTemplate.SlippageCheckFailed.selector, navBefore, navBefore, minNavDelta)
+        );
+        aaveSupplyStrategy.enter(amounts, minNavDelta);
+        vm.stopPrank();
     }
 
     function test_ExitTarget_Partial() public {

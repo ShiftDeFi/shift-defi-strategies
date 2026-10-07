@@ -148,6 +148,32 @@ contract AaveV3SupplyWithMerkleManualClaimTest is AaveV3SupplyWithMerkleBase {
         );
     }
 
+    /// @dev A claim that pays out no new USDC reinvests only what is idle on the strategy. If that is donated dust
+    ///      minting zero scaled aTokens, the claim must leave it idle instead of reverting the whole claim batch.
+    function test_ManualClaim_LeavesDustThatMintsZeroScaledATokens() public {
+        _enterStrategy();
+
+        uint256 claimAmount = 1_000 * 10 ** uint256(IERC20Metadata(USDC).decimals());
+        deal(USDC, address(mockDistributor), claimAmount, true);
+
+        vm.prank(roles.merkleClaimer);
+        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy))
+            .manualClaim(_singleton(USDC), _singleton(claimAmount), _emptyProofs());
+
+        deal(USDC, address(aaveSupplyStrategy), 1, true);
+
+        // Same cumulative amount as already claimed: the distributor pays out nothing, leaving only the dust
+        vm.prank(roles.merkleClaimer);
+        IAaveV3SupplyWithMerkle(address(aaveSupplyStrategy))
+            .manualClaim(_singleton(USDC), _singleton(claimAmount), _emptyProofs());
+
+        assertEq(
+            IERC20(USDC).balanceOf(address(aaveSupplyStrategy)),
+            1,
+            "test_ManualClaim_LeavesDustThatMintsZeroScaledATokens: dust not left idle"
+        );
+    }
+
     function testRevert_ManualClaim_Unauthorized() public {
         _enterStrategy();
 
