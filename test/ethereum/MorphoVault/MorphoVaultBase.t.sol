@@ -53,7 +53,7 @@ abstract contract MorphoVaultBase is EthContext {
                     roles.defaultAdmin,
                     roles.merkleClaimer,
                     morphoVault,
-                    MORPHO_MERKLE_DISTRIBUTOR,
+                    _resolveMerkleDistributor(),
                     new address[](0),
                     SLIPPAGE_PARAMS
                 )
@@ -68,6 +68,11 @@ abstract contract MorphoVaultBase is EthContext {
         inputTokens[0] = underlyingAsset;
 
         _addStrategy(address(morphoVaultStrategy), inputTokens, inputTokens);
+    }
+
+    /// @dev Overridden by tests that drive `manualClaim` to deploy a `MockAngleMerkleDistributor` instead.
+    function _resolveMerkleDistributor() internal virtual returns (address) {
+        return MORPHO_MERKLE_DISTRIBUTOR;
     }
 
     function _enterStrategy() internal {
