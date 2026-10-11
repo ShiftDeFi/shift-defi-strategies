@@ -91,6 +91,11 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
     }
 
     function _harvest(bytes32 stateId, address treasury, uint256 feePct) internal override {
+        // Supplied state only: a paused reserve reverts aToken fee transfers, which must not block token-state exits
+        if (stateId != AAVE_RESERVE_SUPPLIED_STATE_ID) {
+            return;
+        }
+
         AutomaticHarvestLocalVars memory vars;
         vars.reserveATokenCached = reserveAToken;
         vars.reserveAssetCached = reserveAsset;
@@ -101,19 +106,17 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
             vars.feeToTreasury = (vars.currentBalance - vars.balanceBeforeReinvest).mulDiv(feePct, MAX_BPS);
         }
 
-        if (stateId == AAVE_RESERVE_SUPPLIED_STATE_ID) {
-            vars.rewardTokensLength = rewardTokens.length;
-            for (uint256 i = 0; i < vars.rewardTokensLength; ++i) {
-                _swapToInputTokens(rewardTokens[i], vars.reserveAssetCached, 0, false);
-            }
-            vars.aTokenBalanceBefore = IERC20(vars.reserveATokenCached).balanceOf(address(this));
-            _enterAaveReserveSupplied();
-            vars.aTokenDelta = IERC20(vars.reserveATokenCached).balanceOf(address(this)) - vars.aTokenBalanceBefore;
-            if (vars.aTokenDelta > 0) {
-                vars.feeFromReinvest = vars.aTokenDelta.mulDiv(feePct, MAX_BPS);
-                if (vars.feeFromReinvest > 0) {
-                    vars.feeToTreasury += vars.feeFromReinvest;
-                }
+        vars.rewardTokensLength = rewardTokens.length;
+        for (uint256 i = 0; i < vars.rewardTokensLength; ++i) {
+            _swapToInputTokens(rewardTokens[i], vars.reserveAssetCached, 0, false);
+        }
+        vars.aTokenBalanceBefore = IERC20(vars.reserveATokenCached).balanceOf(address(this));
+        _enterAaveReserveSupplied();
+        vars.aTokenDelta = IERC20(vars.reserveATokenCached).balanceOf(address(this)) - vars.aTokenBalanceBefore;
+        if (vars.aTokenDelta > 0) {
+            vars.feeFromReinvest = vars.aTokenDelta.mulDiv(feePct, MAX_BPS);
+            if (vars.feeFromReinvest > 0) {
+                vars.feeToTreasury += vars.feeFromReinvest;
             }
         }
 
@@ -129,11 +132,11 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
     }
 
     /// @inheritdoc IAaveV3SupplyWithMerkle
-    function manualClaim(address[] calldata tokens, uint256[] calldata amounts, bytes32[][] calldata proofs)
-        external
-        nonReentrant
-        onlyRole(MERKLE_CLAIMER_ROLE)
-    {
+    function manualClaim(
+        address[] calldata tokens,
+        uint256[] calldata amounts,
+        bytes32[][] calldata proofs
+    ) external nonReentrant onlyRole(MERKLE_CLAIMER_ROLE) {
         require(!isNavResolutionMode(), NavResolutionModeActivated());
 
         ManualClaimLocalVars memory vars;
