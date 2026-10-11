@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {IStrategyContainer} from "@shift-defi/core/interfaces/IStrategyContainer.sol";
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
 import {Common} from "@shift-defi/core/libraries/Common.sol";
 
@@ -160,6 +161,32 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
             treasuryBalanceAfter,
             treasuryBalanceBefore,
             "test_Harvest_SwapsAndReinvestsRewardToken: no performance fee taken on reinvested reward"
+        );
+    }
+
+    /// @dev At a 100% fee the post-fee balance returns to the checkpoint cached at the start of harvest, so the
+    ///      final write must still replace the pre-fee balance `_enterAaveReserveSupplied` stored mid-harvest.
+    function test_Harvest_ReinvestAtFullFeeSetsCheckpointToPostFeeBalance() public {
+        _enterStrategy();
+
+        vm.prank(roles.strategyManager);
+        IStrategyContainer(mockStrategyContainer).setFeePct(MAX_BPS);
+
+        vm.warp(block.timestamp + 1 days);
+        vm.roll(block.number + 1);
+
+        // USDC left on the strategy stands in for swapped reward tokens: `_harvest` reinvests it
+        deal(USDC, address(aaveSupplyStrategy), 10_000 * 10 ** uint256(IERC20Metadata(USDC).decimals()), true);
+
+        vm.prank(mockStrategyContainer);
+        aaveSupplyStrategy.harvest();
+
+        // aToken transfers round the scaled amount, so the post-fee balance can land a wei off the checkpoint
+        assertApproxEqAbs(
+            AaveV3SupplyWithMerkle(address(aaveSupplyStrategy)).lastReserveATokenBalance(),
+            IERC20(A_MON_USDC).balanceOf(address(aaveSupplyStrategy)),
+            2,
+            "test_Harvest_ReinvestAtFullFeeSetsCheckpointToPostFeeBalance: checkpoint is not the post-fee balance"
         );
     }
 

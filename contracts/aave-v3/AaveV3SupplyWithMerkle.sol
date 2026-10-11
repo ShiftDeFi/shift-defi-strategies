@@ -126,9 +126,7 @@ contract AaveV3SupplyWithMerkle is AccessControlUpgradeable, AaveV3SupplyBase, I
 
         vars.currentBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
 
-        if (vars.currentBalance > vars.balanceBeforeReinvest) {
-            lastReserveATokenBalance = vars.currentBalance;
-        }
+        lastReserveATokenBalance = Math.max(vars.currentBalance, vars.balanceBeforeReinvest);
     }
 
     /// @inheritdoc IAaveV3SupplyWithMerkle
