@@ -15,6 +15,7 @@ interface IMorphoVault {
         uint256 reinvestLpDelta;
         uint256 feeFromReinvest;
         uint256 currentAssetsValue;
+        uint256 lastAssetsValueCached;
     }
 
     struct ManualClaimLocalVars {
@@ -32,6 +33,7 @@ interface IMorphoVault {
         uint256 reinvestLpDelta;
         uint256 feeFromReinvest;
         uint256 currentAssetsValue;
+        uint256 lastAssetsValueCached;
     }
 
     // ---- Events ----

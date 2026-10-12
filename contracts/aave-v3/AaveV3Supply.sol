@@ -30,7 +30,12 @@ contract AaveV3Supply is AaveV3SupplyBase {
         __AaveV3Supply_init(strategyContainer, _pool, _reserveAsset, slippageParams);
     }
 
-    function _harvest(bytes32, address treasury, uint256 feePct) internal override {
+    function _harvest(bytes32 stateId, address treasury, uint256 feePct) internal override {
+        // Supplied state only: a paused reserve reverts aToken fee transfers, which must not block token-state exits
+        if (stateId != AAVE_RESERVE_SUPPLIED_STATE_ID) {
+            return;
+        }
+
         AaveHarvestLocalVars memory vars;
         vars.reserveATokenCached = reserveAToken;
         vars.currentReserveATokenBalance = IERC20(vars.reserveATokenCached).balanceOf(address(this));
