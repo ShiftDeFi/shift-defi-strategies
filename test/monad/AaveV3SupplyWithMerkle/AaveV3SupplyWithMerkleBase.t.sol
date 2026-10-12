@@ -6,10 +6,12 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {IStrategyContainer} from "@shift-defi/core/interfaces/IStrategyContainer.sol";
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
 import {Common} from "@shift-defi/core/libraries/Common.sol";
 
 import {AaveV3SupplyWithMerkle} from "contracts/aave-v3/AaveV3SupplyWithMerkle.sol";
+import {IPool} from "contracts/dependencies/aave-v3/IPool.sol";
 import {IAaveV3Supply} from "contracts/interfaces/IAaveV3Supply.sol";
 
 import {MonadContext} from "test/monad/MonadContext.t.sol";
@@ -22,6 +24,7 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
 
     uint256 internal constant ENTER_AMOUNT = 100_000;
     uint256 internal constant NAV_TOLERANCE_PCT = 2e14; // 0.02%
+    uint256 internal constant RAY = 1e27;
 
     uint256 internal constant ENTER_MAX_SLIPPAGE = 5e16; // 5%
     uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
@@ -159,6 +162,77 @@ abstract contract AaveV3SupplyWithMerkleBase is MonadContext {
             treasuryBalanceBefore,
             "test_Harvest_SwapsAndReinvestsRewardToken: no performance fee taken on reinvested reward"
         );
+    }
+
+    /// @dev At a 100% fee the post-fee balance returns to the checkpoint cached at the start of harvest, so the
+    ///      final write must still replace the pre-fee balance `_enterAaveReserveSupplied` stored mid-harvest.
+    function test_Harvest_ReinvestAtFullFeeSetsCheckpointToPostFeeBalance() public {
+        _enterStrategy();
+
+        vm.prank(roles.strategyManager);
+        IStrategyContainer(mockStrategyContainer).setFeePct(MAX_BPS);
+
+        vm.warp(block.timestamp + 1 days);
+        vm.roll(block.number + 1);
+
+        // USDC left on the strategy stands in for swapped reward tokens: `_harvest` reinvests it
+        deal(USDC, address(aaveSupplyStrategy), 10_000 * 10 ** uint256(IERC20Metadata(USDC).decimals()), true);
+
+        vm.prank(mockStrategyContainer);
+        aaveSupplyStrategy.harvest();
+
+        // aToken transfers round the scaled amount, so the post-fee balance can land a wei off the checkpoint
+        assertApproxEqAbs(
+            AaveV3SupplyWithMerkle(address(aaveSupplyStrategy)).lastReserveATokenBalance(),
+            IERC20(A_MON_USDC).balanceOf(address(aaveSupplyStrategy)),
+            2,
+            "test_Harvest_ReinvestAtFullFeeSetsCheckpointToPostFeeBalance: checkpoint is not the post-fee balance"
+        );
+    }
+
+    /// @dev 1 wei of USDC mints zero scaled aTokens at the current liquidity index, which Aave rejects. Harvest
+    ///      must leave such dust idle instead of reverting, or anyone could stall the container's enter/exit.
+    function test_Harvest_LeavesDustThatMintsZeroScaledATokens() public {
+        _enterStrategy();
+
+        assertGt(
+            IPool(AAVE_V3_POOL).getReserveNormalizedIncome(USDC),
+            RAY,
+            "test_Harvest_LeavesDustThatMintsZeroScaledATokens: 1 wei would mint a scaled aToken"
+        );
+
+        deal(USDC, address(aaveSupplyStrategy), 1, true);
+
+        vm.prank(mockStrategyContainer);
+        aaveSupplyStrategy.harvest();
+
+        assertEq(
+            IERC20(USDC).balanceOf(address(aaveSupplyStrategy)),
+            1,
+            "test_Harvest_LeavesDustThatMintsZeroScaledATokens: dust not left idle"
+        );
+    }
+
+    /// @dev The dust guard in `_enterAaveReserveSupplied` must not let a dust-only enter pass silently: the supply
+    ///      is skipped, so the supplied-state NAV does not move and the template's slippage check rejects it.
+    function testRevert_Enter_DustMintsZeroScaledATokens() public {
+        _enterStrategy();
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1;
+        deal(USDC, mockStrategyContainer, amounts[0], true);
+
+        uint256 minNavDelta =
+            (aaveSupplyStrategy.getTokenAmountInNotion(USDC, amounts[0]) * (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT))
+                / MAX_BPS;
+        uint256 navBefore = aaveSupplyStrategy.stateNav(AAVE_RESERVE_SUPPLIED_STATE_ID);
+
+        vm.startPrank(mockStrategyContainer);
+        vm.expectRevert(
+            abi.encodeWithSelector(IStrategyTemplate.SlippageCheckFailed.selector, navBefore, navBefore, minNavDelta)
+        );
+        aaveSupplyStrategy.enter(amounts, minNavDelta);
+        vm.stopPrank();
     }
 
     function test_ExitTarget_Partial() public {

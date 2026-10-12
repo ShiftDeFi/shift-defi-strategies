@@ -215,12 +215,11 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
         }
     }
 
-    function _calculateAccruedAssetsValue() private view returns (uint256) {
+    function _calculateAccruedAssetsValue(uint256 lastAssetsValueCached) private view returns (uint256) {
         address morphoVaultCached = morphoVault;
         uint256 currentAssetsValue = IERC4626(morphoVaultCached).convertToAssets(
             IERC4626(morphoVaultCached).balanceOf(address(this))
         );
-        uint256 lastAssetsValueCached = lastAssetsValue;
 
         if (currentAssetsValue > lastAssetsValueCached) {
             return currentAssetsValue - lastAssetsValueCached;
@@ -236,7 +235,9 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
         vars.underlyingAssetCached = underlyingAsset;
         vars.rewardTokensLength = rewardTokens.length;
 
-        vars.accruedAssetsValue = _calculateAccruedAssetsValue();
+        // Cached before reinvesting: `_enterMorphoVault` overwrites `lastAssetsValue` with the pre-fee value
+        vars.lastAssetsValueCached = lastAssetsValue;
+        vars.accruedAssetsValue = _calculateAccruedAssetsValue(vars.lastAssetsValueCached);
 
         if (vars.accruedAssetsValue > 0) {
             vars.accruedVaultTokens = IERC4626(vars.morphoVaultCached).convertToShares(vars.accruedAssetsValue);
@@ -268,9 +269,7 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             IERC4626(vars.morphoVaultCached).balanceOf(address(this))
         );
 
-        if (vars.currentAssetsValue > lastAssetsValue) {
-            lastAssetsValue = vars.currentAssetsValue;
-        }
+        lastAssetsValue = Math.max(vars.currentAssetsValue, vars.lastAssetsValueCached);
     }
 
     /// @inheritdoc IMorphoVault
@@ -294,7 +293,9 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
 
         vars.feePct = IStrategyContainer(vars.strategyContainerCached).feePct();
 
-        vars.accruedAssetsValue = _calculateAccruedAssetsValue();
+        // Cached before reinvesting: `_enterMorphoVault` overwrites `lastAssetsValue` with the pre-fee value
+        vars.lastAssetsValueCached = lastAssetsValue;
+        vars.accruedAssetsValue = _calculateAccruedAssetsValue(vars.lastAssetsValueCached);
         if (vars.accruedAssetsValue > 0) {
             vars.accruedVaultTokens = IERC4626(vars.morphoVaultCached).convertToShares(vars.accruedAssetsValue);
             vars.vaultTokensToTreasury = vars.accruedVaultTokens.mulDiv(vars.feePct, MAX_BPS);
@@ -333,8 +334,6 @@ contract MorphoVault is AccessControlUpgradeable, StrategyTemplate, IMorphoVault
             IERC4626(vars.morphoVaultCached).balanceOf(address(this))
         );
 
-        if (vars.currentAssetsValue > lastAssetsValue) {
-            lastAssetsValue = vars.currentAssetsValue;
-        }
+        lastAssetsValue = Math.max(vars.currentAssetsValue, vars.lastAssetsValueCached);
     }
 }

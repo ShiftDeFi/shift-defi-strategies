@@ -41,6 +41,11 @@ const SAFE_TX_SERVICE = "https://api.safe.global/tx-service";
 /** EIP-3770 short names the Safe transaction service is addressed by. */
 const SAFE_CHAIN_SHORTNAME = {1: "eth", 42161: "arb1", 8453: "base"};
 
+/** How the Slack message names the network. */
+const CHAIN_NAME = {1: "ETH", 42161: "ARB", 8453: "BASE"};
+
+const SAFE_APP = "https://app.safe.global";
+
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ECRECOVER_PRECOMPILE = "0x0000000000000000000000000000000000000001";
 
@@ -304,6 +309,166 @@ function revertReason(error) {
     return `reverted${selector ? ` with ${selector}` : ""}: ${error.message.split("\n")[0].slice(0, 200)}`;
 }
 
+const TREE_UPDATED_EVENT = "TreeUpdated(bytes32,bytes32,uint48)";
+
+const WEEK = 7n * 24n * 3600n;
+
+/**
+ * How far back to read `TreeUpdated` when estimating Merkl's schedule: a week and a day, so every
+ * slot of the weekly pattern is seen at least once.
+ */
+const CADENCE_LOOKBACK = WEEK + 24n * 3600n;
+
+/** Times are printed at a fixed UTC offset, as dd-mm-yyyy HH:MM (24h). */
+const UTC_OFFSET_HOURS = 3;
+
+function formatTime(timestamp) {
+    const date = new Date((Number(timestamp) + UTC_OFFSET_HOURS * 3600) * 1000);
+    const pad = (value) => String(value).padStart(2, "0");
+    return (
+        `${pad(date.getUTCDate())}-${pad(date.getUTCMonth() + 1)}-${date.getUTCFullYear()} ` +
+        `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC+${UTC_OFFSET_HOURS}`
+    );
+}
+
+function formatDuration(seconds) {
+    const minutes = Math.max(0, Math.round(Number(seconds) / 60));
+    const hours = Math.floor(minutes / 60);
+    return hours > 0 ? `${hours}h${String(minutes % 60).padStart(2, "0")}m` : `${minutes}m`;
+}
+
+/** cast prints a multi-value return one per line, and a number with a `[1.79e9]` suffix. */
+const firstWord = (output) => output.split("\n")[0].split(" ")[0];
+
+/**
+ * Merkl's tree schedule, read off recent `TreeUpdated` events: the most common spacing of
+ * `endOfDisputePeriod` and its most common phase (the regular 8h grid on mainnet), plus the raw
+ * `ends` so `rootExpiry` can also expect a repeat of anything that happened a week earlier (Merkl
+ * pushes extra trees on Mondays). None of this is enforced by the distributor, so it is only an
+ * estimate — and null if the RPC will not serve the log range.
+ */
+function updateCadence(distributor, now, options) {
+    const rpc = ["--rpc-url", options.rpc];
+    try {
+        const fromBlock = cast("find-block", String(now - CADENCE_LOOKBACK), ...rpc);
+        const logs = JSON.parse(
+            cast(
+                "logs",
+                "--from-block",
+                fromBlock,
+                "--to-block",
+                "latest",
+                "--address",
+                distributor,
+                TREE_UPDATED_EVENT,
+                "--json",
+                ...rpc,
+            ),
+        );
+        // endOfDisputePeriod is the third word of the non-indexed data.
+        const ends = logs.map((log) => BigInt(`0x${log.data.slice(2 + 128, 2 + 192)}`));
+        if (ends.length < 2) return null;
+
+        const mostCommon = (values) => {
+            const counts = new Map();
+            for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+            return [...counts].sort((a, b) => b[1] - a[1])[0][0];
+        };
+        const interval = mostCommon(ends.slice(1).map((end, i) => end - ends[i]));
+        return {interval, phase: mostCommon(ends.map((end) => end % interval)), ends};
+    } catch {
+        return null;
+    }
+}
+
+const rootSchedules = new Map();
+
+/**
+ * When the distributor's live root changes. `getMerkleRoot()` serves `lastTree` until
+ * `endOfDisputePeriod` and `tree` from then on, unless a `disputer` has frozen it; `updateTree`
+ * sets `endOfDisputePeriod` to the update time rounded up to the next epoch plus `disputePeriod`
+ * epochs. So while a tree is pending the switch is known to the second; once it is live the next
+ * one is only bounded below (a tree pushed right now) and otherwise estimated from past updates.
+ * Every strategy shares the distributor, so this is read once per run.
+ */
+function rootSchedule(distributor, options) {
+    if (rootSchedules.has(distributor)) return rootSchedules.get(distributor);
+
+    const rpc = ["--rpc-url", options.rpc];
+    const call = (sig) => firstWord(cast("call", distributor, sig, ...rpc));
+
+    const now = BigInt(cast("block", "latest", "--field", "timestamp", ...rpc));
+    const epoch = BigInt(call("getEpochDuration()(uint32)"));
+    const disputePeriod = BigInt(call("disputePeriod()(uint48)"));
+    const schedule = {
+        now,
+        tree: call("tree()(bytes32,bytes32)"),
+        lastTree: call("lastTree()(bytes32,bytes32)"),
+        endOfDisputePeriod: BigInt(call("endOfDisputePeriod()(uint48)")),
+        disputed: !sameAddress(call("disputer()(address)"), ZERO_ADDRESS),
+        // `_endOfDisputePeriod(now)`: the earliest a tree pushed from here on could go live.
+        earliestNextSwitch: ((now - 1n) / epoch + 1n + disputePeriod) * epoch,
+        cadence: updateCadence(distributor, now, options),
+    };
+
+    rootSchedules.set(distributor, schedule);
+    return schedule;
+}
+
+/**
+ * How long a proof against `root` keeps verifying, as far as the distributor lets us tell:
+ * `expiresAt` is exact only while a tree is pending, otherwise it is the cadence estimate and
+ * `atLeastUntil` the hard lower bound. `detail` is the pre-flight line.
+ */
+function rootExpiry(root, schedule) {
+    const {now, endOfDisputePeriod, earliestNextSwitch, cadence} = schedule;
+    const at = (timestamp) => `${formatTime(timestamp)} (in ${formatDuration(timestamp - now)})`;
+    const pending = now < endOfDisputePeriod;
+
+    // The next tree goes live at the first slot from `from` on that is either on the regular grid
+    // or had a tree exactly a week earlier. Anchoring on the grid rather than on the last tree keeps
+    // an off-grid extra tree from shifting every later estimate.
+    const likelySwitch = (from) => {
+        if (!cadence) return null;
+        const {interval, phase, ends} = cadence;
+        let next = from + ((((phase - from) % interval) + interval) % interval);
+        for (const end of ends) if (end + WEEK >= from && end + WEEK < next) next = end + WEEK;
+        return next;
+    };
+    const likely = (next) =>
+        next === null
+            ? ""
+            : `, likely until ~${at(next)} (Merkl's ${formatDuration(cadence.interval)} schedule and last week's extra trees)`;
+
+    if (schedule.disputed)
+        return {
+            detail: "the pending tree is disputed: the live root stays until governance resolves it",
+        };
+    if (pending && sameAddress(root, schedule.lastTree))
+        return {
+            expiresAt: endOfDisputePeriod,
+            exact: true,
+            detail: `expires at ${at(endOfDisputePeriod)}, when the pending tree goes live`,
+        };
+    if (pending && sameAddress(root, schedule.tree)) {
+        const next = likelySwitch(endOfDisputePeriod + 1n);
+        return {
+            validFrom: endOfDisputePeriod,
+            expiresAt: next,
+            detail: `valid from ${at(endOfDisputePeriod)}${likely(next)}`,
+        };
+    }
+    if (sameAddress(root, schedule.tree)) {
+        const next = likelySwitch(earliestNextSwitch);
+        return {
+            expiresAt: next,
+            atLeastUntil: earliestNextSwitch,
+            detail: `valid at least until ${at(earliestNextSwitch)}${likely(next)}`,
+        };
+    }
+    return {detail: "the proof's root is neither the live nor the pending tree"};
+}
+
 function preflight(strategy, claim, calldata, options) {
     const checks = [];
     const rpc = ["--rpc-url", options.rpc];
@@ -321,6 +486,10 @@ function preflight(strategy, claim, calldata, options) {
                 ? `${short(onChainRoot)} live`
                 : `API root ${short(claim.root)} is not live yet (distributor serves ${short(onChainRoot)})`,
     });
+
+    // Informational: the owners have to execute before the proof goes stale.
+    const expiry = rootExpiry(claim.root, rootSchedule(distributor, options));
+    checks.push({name: "root expiry", ok: true, detail: expiry.detail, expiry});
 
     // Guards against a stale API response: the distributor's own counter is the source of truth.
     const onChainClaimed = BigInt(
@@ -467,7 +636,7 @@ async function nextSafeNonce(options) {
 
 /**
  * The transaction service only accepts proposals from an owner or from a delegate registered by
- * one, so check before asking anyone to unlock a key.
+ * one, so check before submitting anything.
  */
 async function proposerCapacity(proposer, options) {
     const owners = cast("call", options.safe, "getOwners()(address[])", "--rpc-url", options.rpc)
@@ -552,8 +721,7 @@ const safeTxHash = (tx, options) =>
     );
 
 /**
- * Recover the signer from the digest we are about to submit, through the ecrecover precompile, so a
- * signature over the wrong hash fails here instead of being filed under someone else's name.
+ * Recover the signer from the digest we are about to submit, through the ecrecover precompile.
  */
 function recoverSigner(hash, signature, options) {
     const encoded = cast(
@@ -565,13 +733,12 @@ function recoverSigner(hash, signature, options) {
         `0x${signature.slice(66, 130)}`,
     );
     const recovered = cast("call", ECRECOVER_PRECOMPILE, encoded, "--rpc-url", options.rpc);
-    return `0x${recovered.slice(-40)}`;
+    // The transaction service rejects a `sender` that is not EIP-55 checksummed.
+    return cast("to-check-sum-address", `0x${recovered.slice(-40)}`);
 }
 
 async function proposeSafeTx({to, data, operation}, nonce, options) {
     const flags = signerFlags(options);
-    const proposer = castInteractive("wallet", "address", ...flags);
-    const capacity = await proposerCapacity(proposer, options);
 
     const tx = buildSafeTx(to, data, nonce, operation);
     const hash = safeTxHash(tx, options);
@@ -579,9 +746,12 @@ async function proposeSafeTx({to, data, operation}, nonce, options) {
     // hash itself, with no EIP-191 prefix in between.
     const signature = castInteractive("wallet", "sign", "--no-hash", hash, ...flags);
 
-    const recovered = recoverSigner(hash, signature, options);
-    if (!sameAddress(recovered, proposer))
-        throw new Error(`signature recovers to ${recovered}, expected ${proposer}`);
+    // A keystore does not store its address in plaintext, so asking `cast wallet address` for it
+    // would unlock the key a second time. The signature already names the signer; and a signature
+    // over the wrong digest recovers to an address that is neither an owner nor a delegate, so the
+    // capacity check below still rejects it.
+    const proposer = recoverSigner(hash, signature, options);
+    const capacity = await proposerCapacity(proposer, options);
 
     const payload = {
         ...tx,
@@ -638,6 +808,7 @@ const recordProposal = (entry, proposal, options, batched) => {
  * whole rather than trimmed down.
  */
 async function proposeBatch(pending, options) {
+    const proposed = [];
     const blocked = pending.filter(({checks}) => blockingChecks(checks).length > 0);
     if (blocked.length > 0 && !options.force) {
         if (!options.json)
@@ -655,7 +826,7 @@ async function proposeBatch(pending, options) {
                     "",
                 ].join("\n"),
             );
-        return;
+        return proposed;
     }
 
     const multiSend = multiSendAddress();
@@ -666,6 +837,7 @@ async function proposeBatch(pending, options) {
     const proposal = await proposeSafeTx({to: multiSend, data, operation: 1}, nonce, options);
 
     for (const {entry} of pending) recordProposal(entry, proposal, options, true);
+    proposed.push({proposal, claims: pending});
 
     if (!options.json)
         console.log(
@@ -679,13 +851,17 @@ async function proposeBatch(pending, options) {
                 describeProposal(proposal, options),
             ].join("\n"),
         );
+
+    return proposed;
 }
 
 /** One proposal per claim, on consecutive nonces. Here a failing claim is skipped, not fatal. */
 async function proposeSeparately(pending, options) {
+    const proposed = [];
     let nonce = await nextSafeNonce(options);
 
-    for (const {strategy, claim, calldata, checks, entry} of pending) {
+    for (const item of pending) {
+        const {strategy, claim, calldata, checks, entry} = item;
         const blocking = blockingChecks(checks);
         if (blocking.length > 0 && !options.force) {
             if (!options.json)
@@ -701,12 +877,62 @@ async function proposeSeparately(pending, options) {
             options,
         );
         recordProposal(entry, proposal, options, false);
+        proposed.push({proposal, claims: [item]});
 
         if (!options.json)
             console.log(
                 `${claim.symbol} on ${strategy.label}:\n${describeProposal(proposal, options)}`,
             );
     }
+
+    return proposed;
+}
+
+/** Where the owners open a queued transaction in the Safe UI to confirm it. */
+const safeUiTxUrl = (safeTxHash, options) =>
+    `${SAFE_APP}/transactions/tx?safe=${SAFE_CHAIN_SHORTNAME[options.chainId]}:${options.safe}` +
+    `&id=multisig_${options.safe}_${safeTxHash}`;
+
+/**
+ * The `Expires:` line of the Slack message: the earliest-expiring proof across the claims (they
+ * all share one distributor root in practice), or null when there is nothing to say.
+ */
+function expiryLine(claims) {
+    const deadline = (expiry) => expiry.expiresAt ?? expiry.atLeastUntil;
+    const expiry = claims
+        .map(({checks}) => checks.find((check) => check.expiry)?.expiry)
+        .filter((candidate) => candidate && deadline(candidate) != null)
+        .sort((a, b) => (deadline(a) < deadline(b) ? -1 : 1))[0];
+    if (!expiry) return null;
+
+    const from = expiry.validFrom ? ` (valid from ${formatTime(expiry.validFrom)})` : "";
+    if (expiry.exact) return `Expires: ${formatTime(expiry.expiresAt)}${from}`;
+    if (expiry.expiresAt == null) return `Expires: not before ${formatTime(expiry.atLeastUntil)}`;
+    const floor = expiry.atLeastUntil ? `, not before ${formatTime(expiry.atLeastUntil)}` : "";
+    return `Expires: ~${formatTime(expiry.expiresAt)} (estimated${floor})${from}`;
+}
+
+/**
+ * A message to paste into Slack for the other signers, in Slack's mrkdwn (`*bold*`): the network,
+ * the strategies being claimed for, when the proofs go stale, and a Safe UI link per proposal at
+ * the bottom.
+ */
+function slackMessage(proposed, options) {
+    const labels = [
+        ...new Set(proposed.flatMap(({claims}) => claims.map(({strategy}) => strategy.label))),
+    ].map((label) => `*${label}*`);
+    const strategies =
+        labels.length > 1 ? `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}` : labels[0];
+
+    const expires = expiryLine(proposed.flatMap(({claims}) => claims));
+
+    return [
+        `*[${CHAIN_NAME[options.chainId] ?? `CHAIN ${options.chainId}`}]*`,
+        `Executing manual claim on ${strategies}`,
+        ...(expires ? [expires] : []),
+        "",
+        ...proposed.map(({proposal}) => `Tx: ${safeUiTxUrl(proposal.hash, options)}`),
+    ].join("\n");
 }
 
 // ---- output ----
@@ -856,8 +1082,19 @@ async function main() {
     }
 
     if (options.propose && pending.length > 0) {
-        if (options.batch) await proposeBatch(pending, options);
-        else await proposeSeparately(pending, options);
+        const proposed = options.batch
+            ? await proposeBatch(pending, options)
+            : await proposeSeparately(pending, options);
+
+        if (proposed.length > 0 && !options.json)
+            console.log(
+                [
+                    `Slack message for the co-signers${options.dryRun ? " (dry run — the links will not resolve until it is proposed)" : ""}:`,
+                    "",
+                    slackMessage(proposed, options),
+                    "",
+                ].join("\n"),
+            );
     }
 
     if (options.json) {
