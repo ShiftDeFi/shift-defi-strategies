@@ -24,3 +24,7 @@ lcov.info
 
 # Tools output
 claim.json
+
+# Strategy upgrade output (Safe Transaction Builder batches, script logs)
+safe-batch-*.json
+*-upgrade-*.log
