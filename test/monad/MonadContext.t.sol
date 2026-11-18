@@ -75,9 +75,8 @@ abstract contract MonadContext is BaseConfig {
         );
         vm.label(priceOracleAggregator, "PRICE_ORACLE_AGGREGATOR");
 
-        address chainlinkOracleWrapper = address(
-            new ChainlinkOracleWrapper(roles.defaultAdmin, roles.oracleManager, PRICE_ORACLE_UPDATE_INTERVAL)
-        );
+        address chainlinkOracleWrapper =
+            address(new ChainlinkOracleWrapper(roles.defaultAdmin, roles.oracleManager, PRICE_ORACLE_UPDATE_INTERVAL));
         vm.label(chainlinkOracleWrapper, "CHAINLINK_ORACLE_WRAPPER");
 
         vm.startPrank(roles.oracleManager);
@@ -131,8 +130,8 @@ abstract contract MonadContext is BaseConfig {
             swapRouter: swapRouter
         });
 
-        IStrategyContainer.StrategyContainerInitParams memory strategyContainerInitParams = IStrategyContainer
-            .StrategyContainerInitParams({
+        IStrategyContainer.StrategyContainerInitParams memory strategyContainerInitParams =
+            IStrategyContainer.StrategyContainerInitParams({
                 roleAddresses: IStrategyContainer.RoleAddresses({
                     strategyManager: roles.strategyManager,
                     harvestManager: roles.harvestManager,
@@ -150,9 +149,7 @@ abstract contract MonadContext is BaseConfig {
         mockStrategyContainer = _proxify(
             address(new MockStrategyContainer()),
             abi.encodeWithSelector(
-                MockStrategyContainer.initialize.selector,
-                containerInitParams,
-                strategyContainerInitParams
+                MockStrategyContainer.initialize.selector, containerInitParams, strategyContainerInitParams
             )
         );
     }

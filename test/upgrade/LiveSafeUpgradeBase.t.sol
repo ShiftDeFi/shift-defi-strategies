@@ -26,11 +26,8 @@ abstract contract LiveSafeUpgradeBase is LiveUpgradeBase {
         ISafe safe = ISafe(_upgrader());
         uint256 nonceBefore = safe.nonce();
 
-        UpgradeBase.SafeBatch memory batch = upgrader.exposed_prepareSafeBatch(
-            address(safe),
-            MULTISEND_CALL_ONLY_V141,
-            upgrades
-        );
+        UpgradeBase.SafeBatch memory batch =
+            upgrader.exposed_prepareSafeBatch(address(safe), MULTISEND_CALL_ONLY_V141, upgrades);
         assertEq(batch.nonce, nonceBefore);
         assertEq(batch.targets.length, allProxies.length);
 

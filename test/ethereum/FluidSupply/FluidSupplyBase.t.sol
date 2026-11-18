@@ -32,12 +32,11 @@ abstract contract FluidSupplyBase is EthContext {
     uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
     uint256 internal constant EMERGENCY_EXIT_MAX_SLIPPAGE = 5e16; // 5%
 
-    FluidSupply.SlippageParams internal SLIPPAGE_PARAMS =
-        FluidSupply.SlippageParams({
-            enterMaxSlippage: ENTER_MAX_SLIPPAGE,
-            exitMaxSlippage: EXIT_MAX_SLIPPAGE,
-            emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
-        });
+    FluidSupply.SlippageParams internal SLIPPAGE_PARAMS = FluidSupply.SlippageParams({
+        enterMaxSlippage: ENTER_MAX_SLIPPAGE,
+        exitMaxSlippage: EXIT_MAX_SLIPPAGE,
+        emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
+    });
 
     bytes32 internal constant UNDERLYING_ASSET_STATE_ID = keccak256("UNDERLYING_ASSET_STATE_ID");
     bytes32 internal constant FLUID_SUPPLY_STATE_ID = keccak256("FLUID_SUPPLY_STATE_ID");
@@ -80,8 +79,9 @@ abstract contract FluidSupplyBase is EthContext {
         vm.startPrank(mockStrategyContainer);
         IERC20(underlyingAsset).forceApprove(address(fluidSupply), type(uint256).max);
 
-        uint256 minNavDelta = (fluidSupply.getTokenAmountInNotion(underlyingAsset, amounts[0]) *
-            (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT)) / MAX_BPS;
+        uint256 minNavDelta =
+            (fluidSupply.getTokenAmountInNotion(underlyingAsset, amounts[0]) * (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT))
+                / MAX_BPS;
         fluidSupply.enter(amounts, minNavDelta);
 
         vm.stopPrank();
@@ -93,8 +93,7 @@ abstract contract FluidSupplyBase is EthContext {
         assertApproxEqRel(
             IStrategyTemplate(fluidSupply).stateNav(FLUID_SUPPLY_STATE_ID),
             Common.toUnifiedDecimalsUint8(
-                underlyingAsset,
-                ENTER_AMOUNT * 10 ** uint256(IERC20Metadata(underlyingAsset).decimals())
+                underlyingAsset, ENTER_AMOUNT * 10 ** uint256(IERC20Metadata(underlyingAsset).decimals())
             ),
             4 * NAV_TOLERANCE_PCT,
             "test_EnterTarget: Fluid Supply NAV"

@@ -74,9 +74,8 @@ contract EthContext is BaseConfig {
         _grantRoles();
 
         vm.prank(roles.deployer);
-        address chainlinkOracleWrapper = address(
-            new ChainlinkOracleWrapper(roles.defaultAdmin, roles.oracleManager, PRICE_ORACLE_UPDATE_INTERVAL)
-        );
+        address chainlinkOracleWrapper =
+            address(new ChainlinkOracleWrapper(roles.defaultAdmin, roles.oracleManager, PRICE_ORACLE_UPDATE_INTERVAL));
 
         vm.startPrank(roles.oracleManager);
         IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(USDC, USDC_PRICE_FEED);
@@ -104,8 +103,8 @@ contract EthContext is BaseConfig {
             swapRouter: SWAP_ROUTER
         });
 
-        IStrategyContainer.StrategyContainerInitParams memory strategyContainerInitParams = IStrategyContainer
-            .StrategyContainerInitParams({
+        IStrategyContainer.StrategyContainerInitParams memory strategyContainerInitParams =
+            IStrategyContainer.StrategyContainerInitParams({
                 roleAddresses: IStrategyContainer.RoleAddresses({
                     strategyManager: roles.strategyManager,
                     harvestManager: roles.harvestManager,
@@ -123,9 +122,7 @@ contract EthContext is BaseConfig {
         mockStrategyContainer = _proxify(
             address(new MockStrategyContainer()),
             abi.encodeWithSelector(
-                MockStrategyContainer.initialize.selector,
-                containerInitParams,
-                strategyContainerInitParams
+                MockStrategyContainer.initialize.selector, containerInitParams, strategyContainerInitParams
             )
         );
     }

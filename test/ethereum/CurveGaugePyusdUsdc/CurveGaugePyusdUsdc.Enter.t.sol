@@ -24,9 +24,7 @@ contract CurveGaugePyusdUsdcEnterTest is CurveGaugePyusdUsdcBase {
         );
 
         assertEq(
-            IStrategyTemplate(curveGaugePyusdUsdc).stateNav(CURVE_LP_STATE_ID),
-            0,
-            "test_EnterTarget: Curve LP NAV"
+            IStrategyTemplate(curveGaugePyusdUsdc).stateNav(CURVE_LP_STATE_ID), 0, "test_EnterTarget: Curve LP NAV"
         );
         assertEq(
             IStrategyTemplate(curveGaugePyusdUsdc).stateNav(UNDERLYING_ASSETS_STATE_ID),

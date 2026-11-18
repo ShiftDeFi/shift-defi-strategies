@@ -49,15 +49,8 @@ contract MerkleRewardsClaimTest is Test {
         bytes32 positionId = bytes32(uint256(uint160(F_USDC)));
 
         vm.prank(REWARD_WHALE);
-        IFluidMerkleDistributor(FLUID_MERKLE_DISTRIBUTOR).claim(
-            REWARD_WHALE,
-            CUMULATIVE_AMOUNT,
-            POSITION_TYPE,
-            positionId,
-            CYCLE,
-            merkleProof,
-            new bytes(0)
-        );
+        IFluidMerkleDistributor(FLUID_MERKLE_DISTRIBUTOR)
+            .claim(REWARD_WHALE, CUMULATIVE_AMOUNT, POSITION_TYPE, positionId, CYCLE, merkleProof, new bytes(0));
 
         uint256 rewardTokenBalanceAfter = IERC20(rewardToken).balanceOf(REWARD_WHALE);
         assertEq(rewardTokenBalanceAfter, rewardTokenBalanceBefore + EXPECTED_REWARDS);

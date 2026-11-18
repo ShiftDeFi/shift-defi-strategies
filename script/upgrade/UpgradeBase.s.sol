@@ -98,16 +98,12 @@ abstract contract UpgradeBase is Script {
         require(proxyAdmin != address(0), "UpgradeBase: proxy admin not found (is this a transparent proxy?)");
 
         bytes memory upgradeCalldata = abi.encodeCall(
-            ProxyAdmin.upgradeAndCall,
-            (ITransparentUpgradeableProxy(proxy), newImplementation, reinitializeData)
+            ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(proxy), newImplementation, reinitializeData)
         );
 
         if (vm.envOr("EXECUTE_UPGRADE", false)) {
-            ProxyAdmin(proxyAdmin).upgradeAndCall(
-                ITransparentUpgradeableProxy(proxy),
-                newImplementation,
-                reinitializeData
-            );
+            ProxyAdmin(proxyAdmin)
+                .upgradeAndCall(ITransparentUpgradeableProxy(proxy), newImplementation, reinitializeData);
             _logExecuted(label, proxy, proxyAdmin, newImplementation);
         } else {
             _logCalldata(label, proxy, proxyAdmin, newImplementation, upgradeCalldata);
@@ -134,13 +130,8 @@ abstract contract UpgradeBase is Script {
         TimelockController timelockController = TimelockController(payable(timelock));
         batch.salt = salt;
         batch.delay = timelockController.getMinDelay();
-        batch.operationId = timelockController.hashOperationBatch(
-            batch.targets,
-            batch.values,
-            batch.payloads,
-            bytes32(0),
-            salt
-        );
+        batch.operationId =
+            timelockController.hashOperationBatch(batch.targets, batch.values, batch.payloads, bytes32(0), salt);
         require(
             !timelockController.isOperation(batch.operationId),
             "UpgradeBase: timelock operation already exists (change the salt)"
@@ -151,8 +142,7 @@ abstract contract UpgradeBase is Script {
             (batch.targets, batch.values, batch.payloads, bytes32(0), salt, batch.delay)
         );
         batch.executeCalldata = abi.encodeCall(
-            TimelockController.executeBatch,
-            (batch.targets, batch.values, batch.payloads, bytes32(0), salt)
+            TimelockController.executeBatch, (batch.targets, batch.values, batch.payloads, bytes32(0), salt)
         );
     }
 
@@ -189,18 +179,10 @@ abstract contract UpgradeBase is Script {
         batch.multiSend = multiSend;
         batch.data = abi.encodeWithSignature("multiSend(bytes)", packedTransactions);
         batch.nonce = ISafe(safe).nonce();
-        batch.safeTxHash = ISafe(safe).getTransactionHash(
-            multiSend,
-            0,
-            batch.data,
-            SAFE_OPERATION_DELEGATECALL,
-            0,
-            0,
-            0,
-            address(0),
-            address(0),
-            batch.nonce
-        );
+        batch.safeTxHash = ISafe(safe)
+            .getTransactionHash(
+                multiSend, 0, batch.data, SAFE_OPERATION_DELEGATECALL, 0, 0, 0, address(0), address(0), batch.nonce
+            );
     }
 
     /// @notice One `ProxyAdmin.upgradeAndCall(proxy, impl, "")` call per upgrade, validated against `owner`.
@@ -230,8 +212,7 @@ abstract contract UpgradeBase is Script {
 
             targets[i] = proxyAdmin;
             payloads[i] = abi.encodeCall(
-                ProxyAdmin.upgradeAndCall,
-                (ITransparentUpgradeableProxy(upgrade.proxy), upgrade.newImplementation, "")
+                ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(upgrade.proxy), upgrade.newImplementation, "")
             );
         }
     }

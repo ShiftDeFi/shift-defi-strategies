@@ -30,12 +30,11 @@ abstract contract MorphoVaultBase is EthContext {
     uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
     uint256 internal constant EMERGENCY_EXIT_MAX_SLIPPAGE = 5e16; // 5%
 
-    MorphoVault.SlippageParams internal SLIPPAGE_PARAMS =
-        MorphoVault.SlippageParams({
-            enterMaxSlippage: ENTER_MAX_SLIPPAGE,
-            exitMaxSlippage: EXIT_MAX_SLIPPAGE,
-            emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
-        });
+    MorphoVault.SlippageParams internal SLIPPAGE_PARAMS = MorphoVault.SlippageParams({
+        enterMaxSlippage: ENTER_MAX_SLIPPAGE,
+        exitMaxSlippage: EXIT_MAX_SLIPPAGE,
+        emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
+    });
 
     bytes32 internal constant UNDERLYING_ASSET_STATE_ID = keccak256("UNDERLYING_ASSET_STATE_ID");
     bytes32 internal constant MORPHO_VAULT_STATE_ID = keccak256("MORPHO_VAULT_STATE_ID");
@@ -84,8 +83,9 @@ abstract contract MorphoVaultBase is EthContext {
         vm.startPrank(mockStrategyContainer);
         IERC20(underlyingAsset).forceApprove(address(morphoVaultStrategy), type(uint256).max);
 
-        uint256 minNavDelta = (morphoVaultStrategy.getTokenAmountInNotion(underlyingAsset, amounts[0]) *
-            (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT)) / MAX_BPS;
+        uint256 minNavDelta =
+            (morphoVaultStrategy.getTokenAmountInNotion(underlyingAsset, amounts[0])
+                    * (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT)) / MAX_BPS;
         morphoVaultStrategy.enter(amounts, minNavDelta);
 
         vm.stopPrank();
@@ -97,8 +97,7 @@ abstract contract MorphoVaultBase is EthContext {
         assertApproxEqRel(
             IStrategyTemplate(morphoVaultStrategy).stateNav(MORPHO_VAULT_STATE_ID),
             Common.toUnifiedDecimalsUint8(
-                underlyingAsset,
-                ENTER_AMOUNT * 10 ** uint256(IERC20Metadata(underlyingAsset).decimals())
+                underlyingAsset, ENTER_AMOUNT * 10 ** uint256(IERC20Metadata(underlyingAsset).decimals())
             ),
             NAV_TOLERANCE_PCT,
             "test_EnterTarget: Morpho Vault NAV"
@@ -170,10 +169,7 @@ abstract contract MorphoVaultBase is EthContext {
 
         uint256 underlyingAssetNav = morphoVaultStrategy.stateNav(UNDERLYING_ASSET_STATE_ID);
         assertApproxEqRel(
-            underlyingAssetNav,
-            morphoVaultNavBefore,
-            NAV_TOLERANCE_PCT,
-            "test_ExitTarget_Full: Underlying Asset NAV"
+            underlyingAssetNav, morphoVaultNavBefore, NAV_TOLERANCE_PCT, "test_ExitTarget_Full: Underlying Asset NAV"
         );
 
         uint256 exitedAmount = IERC20(underlyingAsset).balanceOf(address(morphoVaultStrategy));
