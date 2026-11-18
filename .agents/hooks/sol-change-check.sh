@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs when an agent stops. Compiling tests (via-IR) costs 30-40 s per edit,
-# so tests are left to the pre-commit hook and CI; this only keeps changed
+# so tests are left to the pre-commit hook; this only keeps changed
 # Solidity formatted and contracts/ compiling.
 set -u
 

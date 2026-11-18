@@ -43,7 +43,7 @@ test-monad *args:
 fmt:
     forge fmt
 
-# Run the same checks as CI
+# Format check, contracts build, every test (what the pre-commit hook runs)
 check:
     forge fmt --check
     {{just_executable()}} build

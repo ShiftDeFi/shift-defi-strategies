@@ -24,7 +24,7 @@ just              # list recipes
 just build        # compile contracts/ and check sizes
 just fmt          # forge fmt
 just test         # every test (fork tests pin their blocks)
-just check        # what CI runs
+just check        # fmt check + build + every test
 just analyze      # slither + aderyn
 ```
 
@@ -44,7 +44,7 @@ Agent instructions live in `AGENTS.md`, read natively by Codex and Cursor.
 - `.claude/settings.json`, `.codex/`, `.cursorignore`: keep `.env` files out
   of agent reach, sandbox shell commands, and run
   `.agents/hooks/sol-change-check.sh` (format + compile `contracts/`) when an
-  agent stops; tests compile and run in the pre-commit hook and CI
+  agent stops; tests compile and run in the pre-commit hook
 
 Symlinks do not survive every Windows checkout; on Windows, enable
 `core.symlinks` or replace each `CLAUDE.md` with a one-line pointer to

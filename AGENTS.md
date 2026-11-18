@@ -26,11 +26,11 @@ just setup        # npm install + git hooks; once per clone
 just build        # forge build contracts --sizes
 just build-all    # tests and scripts too, via the `ir` profile (via-IR)
 just fmt          # forge fmt
-just test        # every test, as CI and the pre-commit hook run it
+just test         # every test, as the pre-commit hook runs it
 just test-eth     # Ethereum fork suite (also test-base, test-monad)
 just test --mt test_Harvest          # one test
 just test --mc MorphoVaultPyusd      # one contract
-just check        # what CI runs
+just check        # fmt check + build + every test
 just analyze      # slither + aderyn (report in reports/aderyn.md)
 ```
 
