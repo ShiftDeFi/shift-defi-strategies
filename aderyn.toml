@@ -1,0 +1,4 @@
+version = 1
+root = "."
+src = "contracts/"
+exclude = ["contracts/dependencies/"]

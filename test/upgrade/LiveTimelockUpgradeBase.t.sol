@@ -102,7 +102,7 @@ abstract contract LiveTimelockUpgradeBase is LiveUpgradeBase {
 
             uint256 minNavDelta = _minEnterNavDelta(strategy, incomingNav);
             vm.prank(_strategyContainer());
-            (, bool hasRemainder, ) = strategy.enter(amounts, minNavDelta);
+            (, bool hasRemainder,) = strategy.enter(amounts, minNavDelta);
             assertFalse(hasRemainder);
             assertEq(strategy.currentStateId(), tokenStateId);
             assertApproxEqRel(strategy.currentStateNav(), tokenStateNav, NAV_TOLERANCE_PCT, vm.getLabel(proxy));
@@ -124,9 +124,7 @@ abstract contract LiveTimelockUpgradeBase is LiveUpgradeBase {
         UpgradeBase.ProxyUpgrade[] memory upgrades = new UpgradeBase.ProxyUpgrade[](allProxies.length);
         for (uint256 i = 0; i < allProxies.length; ++i) {
             upgrades[i] = UpgradeBase.ProxyUpgrade(
-                _kindName(kindOf[allProxies[i]]),
-                allProxies[i],
-                scheduled.newImplementations[i]
+                _kindName(kindOf[allProxies[i]]), allProxies[i], scheduled.newImplementations[i]
             );
         }
 
@@ -160,8 +158,8 @@ abstract contract LiveTimelockUpgradeBase is LiveUpgradeBase {
     function _emergencyExitFully(address proxy, bytes32 toStateId) internal {
         IStrategyTemplate strategy = IStrategyTemplate(proxy);
         uint256 expectedNavDelta = strategy.currentStateNav();
-        uint256 minNavDelta = expectedNavDelta -
-            expectedNavDelta.mulDiv(StrategyTemplate(proxy).emergencyExitMaxSlippage(), MAX_BPS);
+        uint256 minNavDelta =
+            expectedNavDelta - expectedNavDelta.mulDiv(StrategyTemplate(proxy).emergencyExitMaxSlippage(), MAX_BPS);
 
         vm.mockCall(
             _strategyContainer(),

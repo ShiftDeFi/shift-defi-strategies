@@ -97,6 +97,9 @@ abstract contract LiveUpgradeBase is BaseConfig {
     /// @dev `foundry.toml` RPC alias of the chain to fork.
     function _rpcAlias() internal pure virtual returns (string memory);
 
+    /// @dev Block to fork at; must follow the scheduled upgrade's transaction.
+    function _forkBlock() internal pure virtual returns (uint256);
+
     /// @dev The live strategy container all proxies of this chain are registered in.
     function _strategyContainer() internal pure virtual returns (address);
 
@@ -111,7 +114,7 @@ abstract contract LiveUpgradeBase is BaseConfig {
 
     function setUp() public virtual override {
         super.setUp();
-        vm.createSelectFork(vm.rpcUrl(_rpcAlias()));
+        vm.createSelectFork(_rpcAlias(), _forkBlock());
 
         _setUpProxies();
         _register(proxies.curveGauge, Kind.CurveGauge);
@@ -135,10 +138,7 @@ abstract contract LiveUpgradeBase is BaseConfig {
                 vm.expectRevert(
                     bytes(
                         string.concat(
-                            "UpgradeStrategies: not a ",
-                            _kindName(Kind(k)),
-                            " proxy: ",
-                            vm.toString(allProxies[i])
+                            "UpgradeStrategies: not a ", _kindName(Kind(k)), " proxy: ", vm.toString(allProxies[i])
                         )
                     )
                 );
@@ -204,8 +204,8 @@ abstract contract LiveUpgradeBase is BaseConfig {
             Kind kind = kindOf[proxy];
             IStrategyTemplate strategy = IStrategyTemplate(proxy);
             uint256 navBefore = strategy.currentStateNav();
-            bool aaveHasIncome = kind == Kind.AaveV3Supply &&
-                _aTokenBalance(proxy) > AaveV3Supply(proxy).lastReserveATokenBalance();
+            bool aaveHasIncome =
+                kind == Kind.AaveV3Supply && _aTokenBalance(proxy) > AaveV3Supply(proxy).lastReserveATokenBalance();
             uint256 morphoBaselineBefore = kind == Kind.MorphoVault ? MorphoVault(proxy).lastAssetsValue() : 0;
 
             vm.prank(_strategyContainer());
@@ -213,24 +213,18 @@ abstract contract LiveUpgradeBase is BaseConfig {
 
             // Reinvested rewards can raise the NAV; only the fee may lower it
             assertGe(
-                strategy.currentStateNav(),
-                navBefore - navBefore.mulDiv(NAV_TOLERANCE_PCT, MAX_BPS),
-                vm.getLabel(proxy)
+                strategy.currentStateNav(), navBefore - navBefore.mulDiv(NAV_TOLERANCE_PCT, MAX_BPS), vm.getLabel(proxy)
             );
             if (kind == Kind.MorphoVault) {
                 // A baseline left above the assets (pre-fix harvests) is kept until yield catches up with it
                 assertEq(
-                    MorphoVault(proxy).lastAssetsValue(),
-                    Math.max(_morphoAssetsValue(proxy), morphoBaselineBefore)
+                    MorphoVault(proxy).lastAssetsValue(), Math.max(_morphoAssetsValue(proxy), morphoBaselineBefore)
                 );
             } else if (kind == Kind.FluidSupply) {
                 IERC4626 fToken = IERC4626(FluidSupply(proxy).fToken());
                 assertEq(FluidSupply(proxy).lastAssetsValue(), fToken.convertToAssets(fToken.balanceOf(proxy)));
             } else if (kind == Kind.CurveGauge) {
-                assertEq(
-                    CurveGauge(proxy).lastStoredGaugeBalance(),
-                    IERC20(CurveGauge(proxy).gauge()).balanceOf(proxy)
-                );
+                assertEq(CurveGauge(proxy).lastStoredGaugeBalance(), IERC20(CurveGauge(proxy).gauge()).balanceOf(proxy));
             } else if (aaveHasIncome) {
                 assertEq(AaveV3Supply(proxy).lastReserveATokenBalance(), _aTokenBalance(proxy));
             }

@@ -59,14 +59,12 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
 
         address pool = ILiquidityGaugeV6(CURVE_GAUGE_PYUSD_USDC).lp_token();
         uint256[] memory balances = ICurveStableSwapNG(pool).get_balances();
-        uint256 totalReserve = Common.toUnifiedDecimalsUint8(PYUSD, balances[0]) +
-            Common.toUnifiedDecimalsUint8(USDC, balances[1]);
-        enterAmountPyusd =
-            ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(PYUSD, balances[0]), totalReserve) *
-            10 ** uint256(IERC20Metadata(PYUSD).decimals());
-        enterAmountUsdc =
-            ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(USDC, balances[1]), totalReserve) *
-            10 ** uint256(IERC20Metadata(USDC).decimals());
+        uint256 totalReserve =
+            Common.toUnifiedDecimalsUint8(PYUSD, balances[0]) + Common.toUnifiedDecimalsUint8(USDC, balances[1]);
+        enterAmountPyusd = ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(PYUSD, balances[0]), totalReserve) * 10
+            ** uint256(IERC20Metadata(PYUSD).decimals());
+        enterAmountUsdc = ENTER_AMOUNT.mulDiv(Common.toUnifiedDecimalsUint8(USDC, balances[1]), totalReserve) * 10
+            ** uint256(IERC20Metadata(USDC).decimals());
 
         address[] memory inputTokens = new address[](2);
         inputTokens[0] = PYUSD;
@@ -135,8 +133,8 @@ abstract contract CurveGaugePyusdUsdcBase is EthContext {
         uint256 exitedUsdcAmount = IERC20(USDC).balanceOf(address(curveGaugePyusdUsdc));
         uint256 exitedPyusdAmount = IERC20(PYUSD).balanceOf(address(curveGaugePyusdUsdc));
 
-        uint256 exitedNav = Common.toUnifiedDecimalsUint8(USDC, exitedUsdcAmount) +
-            Common.toUnifiedDecimalsUint8(PYUSD, exitedPyusdAmount);
+        uint256 exitedNav = Common.toUnifiedDecimalsUint8(USDC, exitedUsdcAmount)
+            + Common.toUnifiedDecimalsUint8(PYUSD, exitedPyusdAmount);
 
         assertApproxEqRel(
             exitedNav,

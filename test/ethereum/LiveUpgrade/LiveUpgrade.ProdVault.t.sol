@@ -16,6 +16,10 @@ contract LiveUpgradeProdVaultEthereumTest is LiveTimelockUpgradeBase {
         return "ethereum";
     }
 
+    function _forkBlock() internal pure override returns (uint256) {
+        return 26_438_213;
+    }
+
     function _strategyContainer() internal pure override returns (address) {
         return CONTAINER_LOCAL;
     }

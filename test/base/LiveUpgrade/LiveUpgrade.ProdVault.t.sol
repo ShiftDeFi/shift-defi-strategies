@@ -13,6 +13,10 @@ contract LiveUpgradeProdVaultBaseTest is LiveTimelockUpgradeBase {
         return "base";
     }
 
+    function _forkBlock() internal pure override returns (uint256) {
+        return 59_100_126;
+    }
+
     function _strategyContainer() internal pure override returns (address) {
         return CONTAINER_AGENT;
     }

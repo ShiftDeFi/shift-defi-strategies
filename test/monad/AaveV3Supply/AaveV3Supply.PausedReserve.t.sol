@@ -30,12 +30,11 @@ abstract contract AaveV3SupplyPausedReserveTest is MonadContext {
     uint256 internal constant EXIT_MAX_SLIPPAGE = 5e16; // 5%
     uint256 internal constant EMERGENCY_EXIT_MAX_SLIPPAGE = 5e16; // 5%
 
-    IAaveV3Supply.SlippageParams internal SLIPPAGE_PARAMS =
-        IAaveV3Supply.SlippageParams({
-            enterMaxSlippage: ENTER_MAX_SLIPPAGE,
-            exitMaxSlippage: EXIT_MAX_SLIPPAGE,
-            emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
-        });
+    IAaveV3Supply.SlippageParams internal SLIPPAGE_PARAMS = IAaveV3Supply.SlippageParams({
+        enterMaxSlippage: ENTER_MAX_SLIPPAGE,
+        exitMaxSlippage: EXIT_MAX_SLIPPAGE,
+        emergencyExitMaxSlippage: EMERGENCY_EXIT_MAX_SLIPPAGE
+    });
 
     bytes32 internal constant UNDERLYING_ASSET_STATE_ID = keccak256("UNDERLYING_ASSET_STATE_ID");
     bytes32 internal constant AAVE_RESERVE_SUPPLIED_STATE_ID = keccak256("AAVE_RESERVE_SUPPLIED_STATE_ID");
@@ -115,8 +114,9 @@ abstract contract AaveV3SupplyPausedReserveTest is MonadContext {
         vm.startPrank(mockStrategyContainer);
         IERC20(USDC).forceApprove(address(aaveSupplyStrategy), type(uint256).max);
 
-        uint256 minNavDelta = (aaveSupplyStrategy.getTokenAmountInNotion(USDC, amounts[0]) *
-            (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT)) / MAX_BPS;
+        uint256 minNavDelta =
+            (aaveSupplyStrategy.getTokenAmountInNotion(USDC, amounts[0]) * (MAX_BPS - ENTER_MAX_SLIPPAGE + ONE_PCT))
+                / MAX_BPS;
         aaveSupplyStrategy.enter(amounts, minNavDelta);
 
         vm.stopPrank();
@@ -147,17 +147,12 @@ abstract contract AaveV3SupplyPausedReserveTest is MonadContext {
 
 contract AaveV3SupplyUsdcPausedReserveTest is AaveV3SupplyPausedReserveTest {
     function _deployStrategy() internal override returns (address) {
-        return
-            _proxify(
-                address(new AaveV3Supply()),
-                abi.encodeWithSelector(
-                    AaveV3Supply.initialize.selector,
-                    mockStrategyContainer,
-                    AAVE_V3_POOL,
-                    USDC,
-                    SLIPPAGE_PARAMS
-                )
-            );
+        return _proxify(
+            address(new AaveV3Supply()),
+            abi.encodeWithSelector(
+                AaveV3Supply.initialize.selector, mockStrategyContainer, AAVE_V3_POOL, USDC, SLIPPAGE_PARAMS
+            )
+        );
     }
 }
 
@@ -166,20 +161,19 @@ contract AaveV3SupplyWithMerkleUsdcPausedReserveTest is AaveV3SupplyPausedReserv
         address[] memory rewardTokens = new address[](1);
         rewardTokens[0] = WMON;
 
-        return
-            _proxify(
-                address(new AaveV3SupplyWithMerkle()),
-                abi.encodeWithSelector(
-                    AaveV3SupplyWithMerkle.initialize.selector,
-                    mockStrategyContainer,
-                    roles.defaultAdmin,
-                    roles.merkleClaimer,
-                    AAVE_V3_POOL,
-                    USDC,
-                    AAVE_MERKLE_DISTRIBUTOR,
-                    rewardTokens,
-                    SLIPPAGE_PARAMS
-                )
-            );
+        return _proxify(
+            address(new AaveV3SupplyWithMerkle()),
+            abi.encodeWithSelector(
+                AaveV3SupplyWithMerkle.initialize.selector,
+                mockStrategyContainer,
+                roles.defaultAdmin,
+                roles.merkleClaimer,
+                AAVE_V3_POOL,
+                USDC,
+                AAVE_MERKLE_DISTRIBUTOR,
+                rewardTokens,
+                SLIPPAGE_PARAMS
+            )
+        );
     }
 }

@@ -72,9 +72,8 @@ contract MorphoVaultFeeAccountingTest is MorphoVaultBase {
     function _assertLastAssetsValueIsPostFee(string memory testName) internal view {
         assertGt(IERC20(morphoVault).balanceOf(treasury), 0, string.concat(testName, ": no fee shares to treasury"));
 
-        uint256 postFeeAssetsValue = IERC4626(morphoVault).convertToAssets(
-            IERC20(morphoVault).balanceOf(address(morphoVaultStrategy))
-        );
+        uint256 postFeeAssetsValue =
+            IERC4626(morphoVault).convertToAssets(IERC20(morphoVault).balanceOf(address(morphoVaultStrategy)));
         assertEq(
             MorphoVault(address(morphoVaultStrategy)).lastAssetsValue(),
             postFeeAssetsValue,
