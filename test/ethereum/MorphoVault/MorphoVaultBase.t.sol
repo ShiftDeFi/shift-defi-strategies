@@ -8,7 +8,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
-import {Common} from "@shift-defi/core/libraries/Common.sol";
 
 import {MorphoVault} from "contracts/morpho/MorphoVault.sol";
 
@@ -96,7 +95,7 @@ abstract contract MorphoVaultBase is EthContext {
 
         assertApproxEqRel(
             IStrategyTemplate(morphoVaultStrategy).stateNav(MORPHO_VAULT_STATE_ID),
-            Common.toUnifiedDecimalsUint8(
+            morphoVaultStrategy.getTokenAmountInNotion(
                 underlyingAsset, ENTER_AMOUNT * 10 ** uint256(IERC20Metadata(underlyingAsset).decimals())
             ),
             NAV_TOLERANCE_PCT,
@@ -148,7 +147,7 @@ abstract contract MorphoVaultBase is EthContext {
 
         uint256 exitedAmount = IERC20(underlyingAsset).balanceOf(address(morphoVaultStrategy));
         assertApproxEqRel(
-            Common.toUnifiedDecimalsUint8(underlyingAsset, exitedAmount),
+            morphoVaultStrategy.getTokenAmountInNotion(underlyingAsset, exitedAmount),
             morphoVaultNavBefore - morphoVaultNavAfter,
             NAV_TOLERANCE_PCT,
             "test_ExitTarget_Partial: Exited Amount"
@@ -174,7 +173,7 @@ abstract contract MorphoVaultBase is EthContext {
 
         uint256 exitedAmount = IERC20(underlyingAsset).balanceOf(address(morphoVaultStrategy));
         assertApproxEqRel(
-            Common.toUnifiedDecimalsUint8(underlyingAsset, exitedAmount),
+            morphoVaultStrategy.getTokenAmountInNotion(underlyingAsset, exitedAmount),
             morphoVaultNavBefore,
             NAV_TOLERANCE_PCT,
             "test_ExitTarget_Full: Exited Amount"

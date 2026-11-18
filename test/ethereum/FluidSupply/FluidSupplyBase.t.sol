@@ -7,7 +7,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IStrategyTemplate} from "@shift-defi/core/interfaces/IStrategyTemplate.sol";
-import {Common} from "@shift-defi/core/libraries/Common.sol";
 
 import {FluidSupply} from "contracts/fluid/FluidSupply.sol";
 import {IFluidToken} from "contracts/dependencies/fluid/IFluidToken.sol";
@@ -92,7 +91,7 @@ abstract contract FluidSupplyBase is EthContext {
 
         assertApproxEqRel(
             IStrategyTemplate(fluidSupply).stateNav(FLUID_SUPPLY_STATE_ID),
-            Common.toUnifiedDecimalsUint8(
+            fluidSupply.getTokenAmountInNotion(
                 underlyingAsset, ENTER_AMOUNT * 10 ** uint256(IERC20Metadata(underlyingAsset).decimals())
             ),
             4 * NAV_TOLERANCE_PCT,
@@ -151,7 +150,7 @@ abstract contract FluidSupplyBase is EthContext {
 
         uint256 exitedAmount = IERC20(underlyingAsset).balanceOf(address(fluidSupply));
         assertApproxEqRel(
-            Common.toUnifiedDecimalsUint8(underlyingAsset, exitedAmount),
+            fluidSupply.getTokenAmountInNotion(underlyingAsset, exitedAmount),
             fluidSupplyNavBefore - fluidSupplyNavAfter,
             4 * NAV_TOLERANCE_PCT,
             "test_ExitTarget_Partial: Exited Amount"
@@ -175,7 +174,7 @@ abstract contract FluidSupplyBase is EthContext {
 
         uint256 exitedAmount = IERC20(underlyingAsset).balanceOf(address(fluidSupply));
         assertApproxEqRel(
-            Common.toUnifiedDecimalsUint8(underlyingAsset, exitedAmount),
+            fluidSupply.getTokenAmountInNotion(underlyingAsset, exitedAmount),
             fluidSupplyNavBefore,
             4 * NAV_TOLERANCE_PCT,
             "test_ExitTarget_Full: Exited Amount"
