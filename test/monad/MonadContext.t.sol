@@ -29,6 +29,9 @@ import {MockWmonUsdcSwapAdapter} from "test/mocks/MockWmonUsdcSwapAdapter.sol";
 ///      deployed and pre-funded with USDC, so the suite still exercises a real (if not real-liquidity)
 ///      `_swapToInputTokens(WMON, USDC, ...)` swap rather than a no-op on a fork where no adapter exists.
 abstract contract MonadContext is BaseConfig {
+    /// @dev Pinned so fork results are reproducible; bump deliberately in a `test:` commit.
+    uint256 internal constant MONAD_FORK_BLOCK = 123_153_856;
+
     // Real Monad mainnet addresses (see entry-exit-design/AaveV3MonadUSDC.md)
     address internal constant USDC = 0x754704Bc059F8C67012fEd69BC8A327a5aafb603;
     address internal constant USDC_PRICE_FEED = 0x6789f81a983AfE7bd4C2a557c27084Ab705e56AB;
@@ -49,7 +52,7 @@ abstract contract MonadContext is BaseConfig {
     function setUp() public virtual override {
         super.setUp();
 
-        vm.createSelectFork(vm.rpcUrl("monad"));
+        vm.createSelectFork("monad", MONAD_FORK_BLOCK);
 
         vm.label(USDC, "USDC");
         vm.label(USDC_PRICE_FEED, "USDC_PRICE_FEED");

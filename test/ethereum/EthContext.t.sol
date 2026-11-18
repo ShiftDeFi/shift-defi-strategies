@@ -19,6 +19,9 @@ import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 contract EthContext is BaseConfig {
     using stdStorage for StdStorage;
 
+    /// @dev Pinned so fork results are reproducible; bump deliberately in a `test:` commit.
+    uint256 internal constant ETH_FORK_BLOCK = 26_438_213;
+
     // Shift core contracts
     address internal constant VAULT = 0xB6Fa60AF402cd2810a68fC6b2F6Ce66C3d7233C4;
     address internal constant SWAP_ROUTER = 0x2E275e8D4bA74566FB5DF2C5BC72D1e661d3703B;
@@ -53,6 +56,8 @@ contract EthContext is BaseConfig {
 
     function setUp() public virtual override {
         super.setUp();
+
+        vm.createSelectFork("ethereum", ETH_FORK_BLOCK);
 
         vm.label(USDC, "USDC");
         vm.label(PYUSD, "PYUSD");

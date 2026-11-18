@@ -97,6 +97,9 @@ abstract contract LiveUpgradeBase is BaseConfig {
     /// @dev `foundry.toml` RPC alias of the chain to fork.
     function _rpcAlias() internal pure virtual returns (string memory);
 
+    /// @dev Block to fork at; must follow the scheduled upgrade's transaction.
+    function _forkBlock() internal pure virtual returns (uint256);
+
     /// @dev The live strategy container all proxies of this chain are registered in.
     function _strategyContainer() internal pure virtual returns (address);
 
@@ -111,7 +114,7 @@ abstract contract LiveUpgradeBase is BaseConfig {
 
     function setUp() public virtual override {
         super.setUp();
-        vm.createSelectFork(vm.rpcUrl(_rpcAlias()));
+        vm.createSelectFork(_rpcAlias(), _forkBlock());
 
         _setUpProxies();
         _register(proxies.curveGauge, Kind.CurveGauge);
