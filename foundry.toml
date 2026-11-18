@@ -6,6 +6,13 @@ libs = ["lib"]
 optimizer = true
 optimizer-runs = 20
 
+# Tests and scripts only compile with via-IR. Separate out/cache paths keep the
+# plain build of contracts/ from invalidating the via-IR cache, and vice versa.
+[profile.ir]
+via_ir = true
+out = "out-ir"
+cache_path = "cache-ir"
+
 [lint]
 exclude_lints = ["mixed-case-function", "mixed-case-variable"]
 

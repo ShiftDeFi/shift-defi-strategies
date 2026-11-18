@@ -15,6 +15,8 @@ jobs:
       contents: read
     env:
       ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+      BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+      MONAD_RPC_URL: ${{ secrets.MONAD_RPC_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,5 +44,13 @@ jobs:
       - name: Run Forge build
         run: forge build contracts --sizes
 
-      - name: Run Ethereum fork tests
-        run: forge test -vvv --mp "test/ethereum/**" --fork-url ethereum --via-ir
+      # Fork tests pin their blocks, so cached RPC state stays valid until a block is bumped.
+      - name: Cache fork RPC state
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.foundry/cache/rpc
+          key: rpc-${{ hashFiles('test/**/*.sol') }}
+          restore-keys: rpc-
+
+      - name: Run Forge tests
+        run: FOUNDRY_PROFILE=ir forge test -vvv

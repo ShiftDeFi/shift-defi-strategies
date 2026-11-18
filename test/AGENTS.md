@@ -16,6 +16,12 @@
 - Test names: `test_<Behavior>` and `testRevert_<Function>_<Reason>`.
 - Use `vm.expectRevert` with the specific custom error selector, not a bare
   `vm.expectRevert()`.
+- Every fork pins its block: `ETH_FORK_BLOCK` in `EthContext`,
+  `MONAD_FORK_BLOCK` in `MonadContext`, `_forkBlock()` in each live upgrade
+  test, `FORK_BLOCK_NUMBER` in the Merkle claim tests. Never fork the latest
+  block. Bump a block deliberately, in its own `test:` commit, after the
+  suite passes at the new block.
 - NAV assertions use percentage tolerances (`NAV_TOLERANCE_PCT`) rather than
-  exact equality, since fork prices move.
-- Tests compile only with `--via-ir`; the `just test*` recipes pass it.
+  exact equality, so a block bump does not break them.
+- Tests compile only with via-IR: run them through `just test*`, which use
+  the `ir` profile (`FOUNDRY_PROFILE=ir`) and its own build cache.

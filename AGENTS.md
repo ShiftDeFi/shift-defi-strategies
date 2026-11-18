@@ -24,19 +24,22 @@ to v1.8.3 (`foundryup -i v1.8.3`).
 ```shell
 just setup        # npm install + git hooks; once per clone
 just build        # forge build contracts --sizes
-just build-all    # tests and scripts too; they need --via-ir
+just build-all    # tests and scripts too, via the `ir` profile (via-IR)
 just fmt          # forge fmt
-just test-eth     # Ethereum fork suite, as CI runs it
-just test --mt test_Harvest --fork-url ethereum   # one test
-just test --mc MorphoVaultPyusd --fork-url ethereum   # one contract
+just test        # every test, as CI and the pre-commit hook run it
+just test-eth     # Ethereum fork suite (also test-base, test-monad)
+just test --mt test_Harvest          # one test
+just test --mc MorphoVaultPyusd      # one contract
 just check        # what CI runs
 just analyze      # slither + aderyn (report in reports/aderyn.md)
 ```
 
-Tests are **mainnet-fork tests** and need RPC URLs. Forge loads
-`ETH_RPC_URL`, `ARB_RPC_URL`, `BASE_RPC_URL` and `MONAD_RPC_URL` from `.env`,
-which agent sandboxes cannot read; if a fork test cannot reach its RPC, say
-so instead of skipping it.
+Tests are **mainnet-fork tests**, each pinned to a fixed block, so results
+are reproducible and repeat runs come from forge's RPC cache. Forge loads
+`ETH_RPC_URL`, `BASE_RPC_URL` and `MONAD_RPC_URL` from `.env`, which agent
+sandboxes cannot read. Before running tests, ask the human to start the
+agent with those variables exported; if a fork test cannot reach its RPC,
+say so instead of skipping it.
 
 Formatting is `forge fmt` with the `[fmt]` section of `foundry.toml`, tuned
 so existing code does not reflow. Files in its `ignore` list are audited code
@@ -214,8 +217,8 @@ strategies inherit, so it is its own commit.
   why the change is made, not how the code works.
 - No `Co-Authored-By` or other AI attribution trailer.
 - `.githooks/commit-msg` checks the message and `.githooks/pre-commit` runs
-  `forge fmt --check` and `just build` once `just setup` has run in the
-  clone.
+  `forge fmt --check`, `just build` and every test once `just setup` has
+  run in the clone.
 
 ## Rules
 

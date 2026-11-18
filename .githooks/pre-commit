@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -u
 
-# Only Solidity changes need the checks below.
-[ -z "$(git diff --cached --name-only --diff-filter=ACMR -- '*.sol')" ] && exit 0
+# Only changes that can affect compiled code or tests need the checks below.
+changed=$(git diff --cached --name-only --diff-filter=ACMRD -- \
+    '*.sol' foundry.toml foundry.lock remappings.txt package.json)
+[ -z "$changed" ] && exit 0
 
 if ! forge fmt --check >/dev/null 2>&1; then
     echo "pre-commit: forge fmt --check failed; run 'just fmt' and stage the result" >&2
@@ -11,5 +13,11 @@ fi
 
 if ! out=$(forge build contracts --sizes 2>&1); then
     { echo "pre-commit: forge build contracts --sizes failed:"; tail -n 40 <<<"$out"; } >&2
+    exit 1
+fi
+
+# Fork tests pin their blocks, so a failure here is reproducible, not RPC noise.
+if ! out=$(FOUNDRY_PROFILE=ir forge test 2>&1); then
+    { echo "pre-commit: forge test failed:"; tail -n 60 <<<"$out"; } >&2
     exit 1
 fi

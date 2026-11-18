@@ -1,5 +1,9 @@
-# Fork tests read RPC URLs from .env, which forge loads by itself.
+# Fork tests read RPC URLs from .env, which forge loads by itself, and pin
+# their blocks, so repeated runs are served from forge's RPC cache.
 forge_version := "1.8.3"
+
+# Pass recipe args to the shell as "$@", so quoted args (e.g. `--mc "A|B"`) survive.
+set positional-arguments
 
 # List recipes
 default:
@@ -11,29 +15,29 @@ setup:
     git config core.hooksPath .githooks
     @forge --version | grep -q "{{forge_version}}" || echo "warning: forge is not v{{forge_version}}; run 'foundryup -i v{{forge_version}}'"
 
-# Compile contracts/ with size check; tests and scripts need via-ir, see `build-all`
+# Compile contracts/ with size check, as deployed (no via-IR)
 build *args:
-    forge build contracts --sizes {{args}}
+    forge build contracts --sizes "$@"
 
-# Compile everything, tests and scripts included
+# Compile everything with the via-IR `ir` profile, tests and scripts included
 build-all *args:
-    forge build --via-ir {{args}}
+    FOUNDRY_PROFILE=ir forge build "$@"
 
-# Run tests; extra args pass through, e.g. `just test --mt test_Harvest --fork-url ethereum`
+# Run every test; each fork test pins its own block. Extra args pass through, e.g. `just test --mt test_Harvest`
 test *args:
-    forge test --via-ir {{args}}
+    FOUNDRY_PROFILE=ir forge test "$@"
 
-# Ethereum fork suite, as CI runs it
+# Ethereum fork suite
 test-eth *args:
-    forge test -vvv --mp "test/ethereum/**" --fork-url ethereum --via-ir {{args}}
+    FOUNDRY_PROFILE=ir forge test -vvv --mp "test/ethereum/**" "$@"
 
 # Base fork suite
 test-base *args:
-    forge test -vvv --mp "test/base/**" --fork-url base --via-ir {{args}}
+    FOUNDRY_PROFILE=ir forge test -vvv --mp "test/base/**" "$@"
 
 # Monad fork suite
 test-monad *args:
-    forge test -vvv --mp "test/monad/**" --fork-url monad --via-ir {{args}}
+    FOUNDRY_PROFILE=ir forge test -vvv --mp "test/monad/**" "$@"
 
 # Format sources
 fmt:
@@ -43,15 +47,15 @@ fmt:
 check:
     forge fmt --check
     {{just_executable()}} build
-    {{just_executable()}} test-eth
+    {{just_executable()}} test
 
 # Run slither over contracts/; extra args pass through, e.g. `just slither --exclude-low`
 slither *args:
-    slither . {{args}}
+    slither . "$@"
 
 # Run aderyn over contracts/; report in reports/aderyn.md
 aderyn *args:
-    aderyn . --skip-update-check --output reports/aderyn.md {{args}}
+    aderyn . --skip-update-check --output reports/aderyn.md "$@"
 
 # Run slither and aderyn before deployment
 analyze:
@@ -60,8 +64,8 @@ analyze:
 
 # Build Merkl claim calldata; see tools/README.md
 claim *args:
-    npm run claim -- {{args}}
+    npm run claim -- "$@"
 
 # Build Merkl claim calldata and queue it on the claimer Safe
 claim-propose *args:
-    npm run claim:propose -- {{args}}
+    npm run claim:propose -- "$@"

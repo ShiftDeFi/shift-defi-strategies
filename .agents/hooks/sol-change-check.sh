@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs when an agent stops. Fork tests need RPC access, so they are left
-# to the agent and CI; this only keeps changed Solidity formatted and compiling.
+# Runs when an agent stops. Compiling tests (via-IR) costs 30-40 s per edit,
+# so tests are left to the pre-commit hook and CI; this only keeps changed
+# Solidity formatted and contracts/ compiling.
 set -u
 
 input=$(cat)
@@ -13,10 +14,5 @@ just fmt >/dev/null 2>&1
 
 if ! out=$(just build 2>&1); then
     { echo "just build failed:"; tail -n 60 <<<"$out"; } >&2
-    exit 2
-fi
-
-if ! out=$(just build-all 2>&1); then
-    { echo "just build-all failed:"; tail -n 60 <<<"$out"; } >&2
     exit 2
 fi
