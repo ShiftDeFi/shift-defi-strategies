@@ -28,3 +28,9 @@ claim.json
 # Strategy upgrade output (Safe Transaction Builder batches, script logs)
 safe-batch-*.json
 *-upgrade-*.log
+
+# Static analysis reports
+reports/
+
+# Personal agent settings
+.claude/settings.local.json

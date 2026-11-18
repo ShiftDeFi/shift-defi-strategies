@@ -9,6 +9,27 @@ optimizer-runs = 20
 [lint]
 exclude_lints = ["mixed-case-function", "mixed-case-variable"]
 
+# Chosen so existing code does not reflow. Pinned forge: v1.8.3.
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+quote_style = "double"
+number_underscore = "preserve"
+int_types = "preserve"
+single_line_statement_blocks = "preserve"
+wrap_comments = false
+sort_imports = false
+multiline_func_header = "params_first_multi"
+ignore = [
+    "contracts/dependencies/**",
+    # Audited code that forge fmt would rewrap. Remove an entry and run
+    # `forge fmt` in the same change that next sends the file to audit.
+    "contracts/curve-gauge/CurveGauge.sol",
+    "contracts/fluid/FluidSupply.sol",
+    "contracts/morpho/MorphoVault.sol",
+]
+
 [rpc_endpoints]
 ethereum = "${ETH_RPC_URL}"
 arbitrum = "${ARB_RPC_URL}"

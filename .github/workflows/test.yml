@@ -1,28 +1,37 @@
 name: CI
 
-permissions:
-  contents: read
+permissions: {}
 
 on:
   push:
   pull_request:
   workflow_dispatch:
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   check:
     name: Foundry project
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           submodules: recursive
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install npm dependencies
+        run: npm install --ignore-scripts
+
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: v1.8.3
 
       - name: Show Forge version
         run: forge --version
@@ -31,7 +40,7 @@ jobs:
         run: forge fmt --check
 
       - name: Run Forge build
-        run: forge build --sizes
+        run: forge build contracts --sizes
 
-      - name: Run Forge tests
-        run: forge test -vvv
+      - name: Run Ethereum fork tests
+        run: forge test -vvv --mp "test/ethereum/**" --fork-url ethereum --via-ir
