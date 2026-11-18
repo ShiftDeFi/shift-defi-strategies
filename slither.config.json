@@ -1,0 +1,5 @@
+{
+  "filter_paths": "(lib/|node_modules/|contracts/dependencies/|test/|script/)",
+  "exclude_dependencies": true,
+  "exclude_informational": true
+}
