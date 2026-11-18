@@ -27,7 +27,7 @@ contract DeployFluidSupplyUsdt is DeployBase {
 
         vm.startBroadcast();
         address implementation = address(new FluidSupply());
-        address proxy = _proxifyWithSalt(
+        _proxifyWithSalt(
             implementation,
             abi.encodeWithSelector(
                 FluidSupply.initialize.selector,

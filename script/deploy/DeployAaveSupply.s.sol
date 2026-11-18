@@ -25,7 +25,7 @@ contract DeployAaveSupply is DeployBase {
 
         vm.startBroadcast();
         address implementation = address(new AaveV3Supply());
-        address proxy = _proxifyWithSalt(
+        _proxifyWithSalt(
             implementation,
             abi.encodeWithSelector(
                 AaveV3Supply.initialize.selector, strategyContainer, pool, reserveAsset, slippageParams

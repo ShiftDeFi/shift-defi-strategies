@@ -31,6 +31,7 @@ just test-eth     # Ethereum fork suite (also test-base, test-monad)
 just test --mt test_Harvest          # one test
 just test --mc MorphoVaultPyusd      # one contract
 just check        # fmt check + build + every test
+just lint         # forge lint (not run on build)
 just analyze      # slither + aderyn (report in reports/aderyn.md)
 ```
 

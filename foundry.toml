@@ -2,6 +2,11 @@
 src = "contracts"
 out = "out"
 libs = ["lib"]
+solc_version = "0.8.28"
+evm_version = "prague"
+# Remappings come only from remappings.txt, so no local paths reach metadata.
+auto_detect_remappings = false
+deny = "notes"
 
 optimizer = true
 optimizer-runs = 20
@@ -14,6 +19,9 @@ out = "out-ir"
 cache_path = "cache-ir"
 
 [lint]
+# Audited contracts/ carries 24 known lint findings; with deny = "notes" they
+# would fail every build. Run `forge lint` to see them.
+lint_on_build = false
 exclude_lints = ["mixed-case-function", "mixed-case-variable"]
 
 # Chosen so existing code does not reflow. Pinned forge: v1.8.3.

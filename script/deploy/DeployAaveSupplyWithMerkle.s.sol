@@ -31,7 +31,7 @@ contract DeployAaveSupplyWithMerkle is DeployBase {
 
         vm.startBroadcast();
         address implementation = address(new AaveV3SupplyWithMerkle());
-        address proxy = _proxifyWithSalt(
+        _proxifyWithSalt(
             implementation,
             abi.encodeWithSelector(
                 AaveV3SupplyWithMerkle.initialize.selector,

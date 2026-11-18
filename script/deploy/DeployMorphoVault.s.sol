@@ -29,7 +29,7 @@ contract DeployMorphoVault is DeployBase {
 
         vm.startBroadcast();
         address implementation = address(new MorphoVault());
-        address proxy = _proxifyWithSalt(
+        _proxifyWithSalt(
             implementation,
             abi.encodeWithSelector(
                 MorphoVault.initialize.selector,

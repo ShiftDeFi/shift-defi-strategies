@@ -49,6 +49,10 @@ check:
     {{just_executable()}} build
     {{just_executable()}} test
 
+# Forge lints (not run on build; contracts/ has known findings)
+lint *args:
+    forge lint "$@"
+
 # Run slither over contracts/; extra args pass through, e.g. `just slither --exclude-low`
 slither *args:
     slither . "$@"
