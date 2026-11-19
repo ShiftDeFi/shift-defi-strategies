@@ -76,13 +76,16 @@ IDs (`keccak256("...")`) registered in `initialize` via
 `_setState(stateId, isTargetState, isProtocolState, isTokenState, height)`:
 
 - _token state_: funds sit as the raw underlying asset in the strategy
-  (height 0/1, the emergency-exit destination);
+  (the lowest height, the emergency-exit destination);
 - _protocol state_: funds are deposited in the external protocol;
 - _target state_: where `enter()` puts funds by default; exactly one per
   strategy, and it cannot also be a token state;
 - _height_: depth of the position, used to order emergency exits (see
   `CurveGauge`, which has three stacked states: underlying → Curve LP →
-  gauge).
+  gauge). Heights start at 1: height 0 is the unregistered
+  `NO_ALLOCATION_STATE_ID`, and it is the only thing stopping an emergency
+  exit from a strategy that holds nothing. Aave, Morpho and Fluid start at
+  0; their live proxies keep those heights, so leave them as they are.
 
 The template drives the state machine and calls these hooks, which each
 strategy overrides and which must `revert StateNotFound(stateId)` for

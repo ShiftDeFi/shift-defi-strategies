@@ -38,6 +38,7 @@ contract EthContext is BaseConfig {
     address internal constant USDC_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
     address internal constant PYUSD_PRICE_FEED = 0x8f1dF6D7F2db73eECE86a18b4381F4707b918FB1;
     address internal constant RLUSD_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+    address internal constant USDT_PRICE_FEED = 0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
 
     address internal PYUSD_USDC_ADAPTER = 0x9059c7a9921fFF86Df6d16Cb02578BaeD5835397;
 
@@ -53,6 +54,13 @@ contract EthContext is BaseConfig {
     address internal constant MORPHO_SENTORA_PYUSD = 0xb576765fB15505433aF24FEe2c0325895C559FB2;
     address internal constant MORPHO_SENTORA_RLUSD = 0x6dC58a0FdfC8D694e571DC59B9A52EEEa780E6bf;
     address internal constant MORPHO_MERKLE_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
+
+    // Compound V3 addresses
+    address internal constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address internal constant COMP = 0xc00e94Cb662C3520282E6f5717214004A7f26888;
+    address internal constant COMPOUND_V3_USDT = 0x3Afdc9BCA9213A35503b077a6072F3D0d5AB0840;
+    address internal constant COMPOUND_V3_USDC = 0xc3d688B66703497DAA19211EEdff47f25384cdc3;
+    address internal constant COMPOUND_MERKLE_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
 
     function setUp() public virtual override {
         super.setUp();
@@ -86,10 +94,12 @@ contract EthContext is BaseConfig {
         IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(USDC, USDC_PRICE_FEED);
         IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(PYUSD, PYUSD_PRICE_FEED);
         IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(RLUSD, RLUSD_PRICE_FEED);
+        IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(USDT, USDT_PRICE_FEED);
 
         IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(USDC, chainlinkOracleWrapper);
         IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(PYUSD, chainlinkOracleWrapper);
         IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(RLUSD, chainlinkOracleWrapper);
+        IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(USDT, chainlinkOracleWrapper);
         vm.stopPrank();
     }
 
