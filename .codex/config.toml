@@ -1,0 +1,20 @@
+# Project-scoped Codex config. Loaded only when the project is trusted, and
+# ignored if any loaded config sets `sandbox_mode` or `--sandbox` is passed.
+default_permissions = "harness"
+
+[permissions.harness]
+description = "Workspace edits; .env files unreadable to sandboxed commands."
+extends = ":workspace"
+
+[permissions.harness.filesystem]
+# forge installs solc and caches RPC data outside the workspace.
+"~/.svm" = "write"
+"~/.foundry/cache" = "write"
+
+[permissions.harness.filesystem.":workspace_roots"]
+"**/.env" = "deny"
+"**/.env.*" = "deny"
+"**/*.env" = "deny"
+# Hooks must not be editable by the agents they check.
+".agents" = "read"
+".githooks" = "read"

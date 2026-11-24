@@ -309,16 +309,6 @@ function revertReason(error) {
     return `reverted${selector ? ` with ${selector}` : ""}: ${error.message.split("\n")[0].slice(0, 200)}`;
 }
 
-const TREE_UPDATED_EVENT = "TreeUpdated(bytes32,bytes32,uint48)";
-
-const WEEK = 7n * 24n * 3600n;
-
-/**
- * How far back to read `TreeUpdated` when estimating Merkl's schedule: a week and a day, so every
- * slot of the weekly pattern is seen at least once.
- */
-const CADENCE_LOOKBACK = WEEK + 24n * 3600n;
-
 /** Times are printed at a fixed UTC offset, as dd-mm-yyyy HH:MM (24h). */
 const UTC_OFFSET_HOURS = 3;
 
@@ -340,47 +330,6 @@ function formatDuration(seconds) {
 /** cast prints a multi-value return one per line, and a number with a `[1.79e9]` suffix. */
 const firstWord = (output) => output.split("\n")[0].split(" ")[0];
 
-/**
- * Merkl's tree schedule, read off recent `TreeUpdated` events: the most common spacing of
- * `endOfDisputePeriod` and its most common phase (the regular 8h grid on mainnet), plus the raw
- * `ends` so `rootExpiry` can also expect a repeat of anything that happened a week earlier (Merkl
- * pushes extra trees on Mondays). None of this is enforced by the distributor, so it is only an
- * estimate — and null if the RPC will not serve the log range.
- */
-function updateCadence(distributor, now, options) {
-    const rpc = ["--rpc-url", options.rpc];
-    try {
-        const fromBlock = cast("find-block", String(now - CADENCE_LOOKBACK), ...rpc);
-        const logs = JSON.parse(
-            cast(
-                "logs",
-                "--from-block",
-                fromBlock,
-                "--to-block",
-                "latest",
-                "--address",
-                distributor,
-                TREE_UPDATED_EVENT,
-                "--json",
-                ...rpc,
-            ),
-        );
-        // endOfDisputePeriod is the third word of the non-indexed data.
-        const ends = logs.map((log) => BigInt(`0x${log.data.slice(2 + 128, 2 + 192)}`));
-        if (ends.length < 2) return null;
-
-        const mostCommon = (values) => {
-            const counts = new Map();
-            for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-            return [...counts].sort((a, b) => b[1] - a[1])[0][0];
-        };
-        const interval = mostCommon(ends.slice(1).map((end, i) => end - ends[i]));
-        return {interval, phase: mostCommon(ends.map((end) => end % interval)), ends};
-    } catch {
-        return null;
-    }
-}
-
 const rootSchedules = new Map();
 
 /**
@@ -388,7 +337,7 @@ const rootSchedules = new Map();
  * `endOfDisputePeriod` and `tree` from then on, unless a `disputer` has frozen it; `updateTree`
  * sets `endOfDisputePeriod` to the update time rounded up to the next epoch plus `disputePeriod`
  * epochs. So while a tree is pending the switch is known to the second; once it is live the next
- * one is only bounded below (a tree pushed right now) and otherwise estimated from past updates.
+ * one is only bounded below (a tree pushed right now): Merkl's off-chain schedule is not on-chain.
  * Every strategy shares the distributor, so this is read once per run.
  */
 function rootSchedule(distributor, options) {
@@ -408,7 +357,6 @@ function rootSchedule(distributor, options) {
         disputed: !sameAddress(call("disputer()(address)"), ZERO_ADDRESS),
         // `_endOfDisputePeriod(now)`: the earliest a tree pushed from here on could go live.
         earliestNextSwitch: ((now - 1n) / epoch + 1n + disputePeriod) * epoch,
-        cadence: updateCadence(distributor, now, options),
     };
 
     rootSchedules.set(distributor, schedule);
@@ -416,57 +364,21 @@ function rootSchedule(distributor, options) {
 }
 
 /**
- * How long a proof against `root` keeps verifying, as far as the distributor lets us tell:
- * `expiresAt` is exact only while a tree is pending, otherwise it is the cadence estimate and
- * `atLeastUntil` the hard lower bound. `detail` is the pre-flight line.
+ * How long a proof against `root` keeps verifying, as far as the distributor states it: exact while
+ * a tree is pending, otherwise only a lower bound. Returns the pre-flight line.
  */
 function rootExpiry(root, schedule) {
-    const {now, endOfDisputePeriod, earliestNextSwitch, cadence} = schedule;
+    const {now, endOfDisputePeriod, earliestNextSwitch} = schedule;
     const at = (timestamp) => `${formatTime(timestamp)} (in ${formatDuration(timestamp - now)})`;
     const pending = now < endOfDisputePeriod;
 
-    // The next tree goes live at the first slot from `from` on that is either on the regular grid
-    // or had a tree exactly a week earlier. Anchoring on the grid rather than on the last tree keeps
-    // an off-grid extra tree from shifting every later estimate.
-    const likelySwitch = (from) => {
-        if (!cadence) return null;
-        const {interval, phase, ends} = cadence;
-        let next = from + ((((phase - from) % interval) + interval) % interval);
-        for (const end of ends) if (end + WEEK >= from && end + WEEK < next) next = end + WEEK;
-        return next;
-    };
-    const likely = (next) =>
-        next === null
-            ? ""
-            : `, likely until ~${at(next)} (Merkl's ${formatDuration(cadence.interval)} schedule and last week's extra trees)`;
-
     if (schedule.disputed)
-        return {
-            detail: "the pending tree is disputed: the live root stays until governance resolves it",
-        };
+        return "the pending tree is disputed: the live root stays until governance resolves it";
     if (pending && sameAddress(root, schedule.lastTree))
-        return {
-            expiresAt: endOfDisputePeriod,
-            exact: true,
-            detail: `expires at ${at(endOfDisputePeriod)}, when the pending tree goes live`,
-        };
-    if (pending && sameAddress(root, schedule.tree)) {
-        const next = likelySwitch(endOfDisputePeriod + 1n);
-        return {
-            validFrom: endOfDisputePeriod,
-            expiresAt: next,
-            detail: `valid from ${at(endOfDisputePeriod)}${likely(next)}`,
-        };
-    }
-    if (sameAddress(root, schedule.tree)) {
-        const next = likelySwitch(earliestNextSwitch);
-        return {
-            expiresAt: next,
-            atLeastUntil: earliestNextSwitch,
-            detail: `valid at least until ${at(earliestNextSwitch)}${likely(next)}`,
-        };
-    }
-    return {detail: "the proof's root is neither the live nor the pending tree"};
+        return `expires at ${at(endOfDisputePeriod)}, when the pending tree goes live`;
+    if (pending && sameAddress(root, schedule.tree)) return `valid from ${at(endOfDisputePeriod)}`;
+    if (sameAddress(root, schedule.tree)) return `valid at least until ${at(earliestNextSwitch)}`;
+    return "the proof's root is neither the live nor the pending tree";
 }
 
 function preflight(strategy, claim, calldata, options) {
@@ -489,7 +401,7 @@ function preflight(strategy, claim, calldata, options) {
 
     // Informational: the owners have to execute before the proof goes stale.
     const expiry = rootExpiry(claim.root, rootSchedule(distributor, options));
-    checks.push({name: "root expiry", ok: true, detail: expiry.detail, expiry});
+    checks.push({name: "root expiry", ok: true, detail: expiry});
 
     // Guards against a stale API response: the distributor's own counter is the source of truth.
     const onChainClaimed = BigInt(
@@ -894,44 +806,26 @@ const safeUiTxUrl = (safeTxHash, options) =>
     `&id=multisig_${options.safe}_${safeTxHash}`;
 
 /**
- * The `Expires:` line of the Slack message: the earliest-expiring proof across the claims (they
- * all share one distributor root in practice), or null when there is nothing to say.
- */
-function expiryLine(claims) {
-    const deadline = (expiry) => expiry.expiresAt ?? expiry.atLeastUntil;
-    const expiry = claims
-        .map(({checks}) => checks.find((check) => check.expiry)?.expiry)
-        .filter((candidate) => candidate && deadline(candidate) != null)
-        .sort((a, b) => (deadline(a) < deadline(b) ? -1 : 1))[0];
-    if (!expiry) return null;
-
-    const from = expiry.validFrom ? ` (valid from ${formatTime(expiry.validFrom)})` : "";
-    if (expiry.exact) return `Expires: ${formatTime(expiry.expiresAt)}${from}`;
-    if (expiry.expiresAt == null) return `Expires: not before ${formatTime(expiry.atLeastUntil)}`;
-    const floor = expiry.atLeastUntil ? `, not before ${formatTime(expiry.atLeastUntil)}` : "";
-    return `Expires: ~${formatTime(expiry.expiresAt)} (estimated${floor})${from}`;
-}
-
-/**
- * A message to paste into Slack for the other signers, in Slack's mrkdwn (`*bold*`): the network,
- * the strategies being claimed for, when the proofs go stale, and a Safe UI link per proposal at
- * the bottom.
+ * A message to paste into Slack for the other signers. Slack's composer reads pasted text as
+ * Markdown, not mrkdwn, so bold is `**bold**` (`*x*` would come out italic) and the Safe UI link is a
+ * `[text](url)` link rather than the raw URL. The network, the strategies being claimed for, and a
+ * link per proposal at the bottom.
  */
 function slackMessage(proposed, options) {
     const labels = [
         ...new Set(proposed.flatMap(({claims}) => claims.map(({strategy}) => strategy.label))),
-    ].map((label) => `*${label}*`);
+    ].map((label) => `**${label}**`);
     const strategies =
         labels.length > 1 ? `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}` : labels[0];
 
-    const expires = expiryLine(proposed.flatMap(({claims}) => claims));
-
     return [
-        `*[${CHAIN_NAME[options.chainId] ?? `CHAIN ${options.chainId}`}]*`,
+        `**[${CHAIN_NAME[options.chainId] ?? `CHAIN ${options.chainId}`}]**`,
         `Executing manual claim on ${strategies}`,
-        ...(expires ? [expires] : []),
         "",
-        ...proposed.map(({proposal}) => `Tx: ${safeUiTxUrl(proposal.hash, options)}`),
+        ...proposed.map(({proposal}) => {
+            const shortHash = `${proposal.hash.slice(0, 10)}…${proposal.hash.slice(-6)}`;
+            return `Tx: [${shortHash}](${safeUiTxUrl(proposal.hash, options)})`;
+        }),
     ].join("\n");
 }
 

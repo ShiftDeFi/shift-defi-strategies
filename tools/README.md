@@ -84,24 +84,22 @@ The proposal digest is read from the Safe's own `getTransactionHash`.
 
 ### Slack message
 
-After proposing, it prints a Slack message (mrkdwn) for the co-signers:
+After proposing, it prints a Slack message for the co-signers. It is Markdown, not mrkdwn: the
+Slack composer parses pasted text as Markdown, so `*x*` would come out italic.
 
-- the network as `*[ETH]*`;
+- the network as `**[ETH]**`;
 - the strategies, in bold;
-- an `Expires:` line;
-- the Safe UI link to each queued transaction, at the bottom.
+- a `Tx: [0x1026d173…d308ba](…)` link to each queued transaction in the Safe UI, at the bottom.
 
-Times are dd-mm-yyyy HH:MM at a fixed UTC+3 (`UTC_OFFSET_HOURS`).
+### Root expiry
+
+The pre-flight prints a "root expiry" line, which never blocks a proposal. Times are
+dd-mm-yyyy HH:MM at a fixed UTC+3 (`UTC_OFFSET_HOURS`).
 
 The expiry comes from the distributor. `getMerkleRoot()` serves `lastTree` until
 `endOfDisputePeriod` and `tree` after it.
 
 - **A tree is pending:** the switch time is exact.
-- **The tree is live:** the next switch is only bounded below by `_endOfDisputePeriod(now)`. The likely
-  time is estimated from the last 8 days of `TreeUpdated` events: the next slot on Merkl's regular
-  grid (every 8h at 05:00 / 13:00 / 21:00 UTC+3 on mainnet), or earlier if a tree went live at that
-  time a week before (Merkl adds 11:00 and 19:00 trees on Mondays). Backtested over 12-09 to
-  07-10-2026, it is exact 93% of the time. In 2% the root dies earlier than stated, and in 5% it
-  lives longer (a skipped update).
-
-The pre-flight prints the same as a "root expiry" line, which never blocks a proposal.
+- **The tree is live:** the next switch is only bounded below by `_endOfDisputePeriod(now)`, the
+  earliest a tree pushed right now could go live. When Merkl actually pushes it is decided off-chain,
+  so the tool does not guess.

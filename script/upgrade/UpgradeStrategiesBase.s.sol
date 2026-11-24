@@ -50,10 +50,8 @@ abstract contract UpgradeStrategiesBase is UpgradeBase {
     /// @notice Deploys one new implementation per proxy.
     function _deployImplementations(StrategyProxies memory proxies) internal returns (ProxyUpgrade[] memory upgrades) {
         upgrades = new ProxyUpgrade[](
-            proxies.curveGauge.length +
-                proxies.morphoVault.length +
-                proxies.fluidSupply.length +
-                proxies.aaveV3Supply.length
+            proxies.curveGauge.length + proxies.morphoVault.length + proxies.fluidSupply.length
+                + proxies.aaveV3Supply.length
         );
         uint256 n;
 
@@ -80,7 +78,7 @@ abstract contract UpgradeStrategiesBase is UpgradeBase {
     }
 
     function _requireNoGetter(address proxy, string memory getter, string memory kind) private view {
-        (bool success, ) = proxy.staticcall(abi.encodeWithSignature(getter));
+        (bool success,) = proxy.staticcall(abi.encodeWithSignature(getter));
         require(!success, string.concat("UpgradeStrategies: not a ", kind, " proxy: ", vm.toString(proxy)));
     }
 }

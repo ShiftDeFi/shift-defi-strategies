@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/*.env)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(**/*.env)"
+    ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.agents/hooks/sol-change-check.sh\""
+          }
+        ]
+      }
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "denyRead": ["./.env", "./.env.*", "./**/.env", "./**/.env.*", "./**/*.env"],
+      "denyWrite": ["./.agents", "./.githooks"],
+      "allowWrite": ["~/.svm", "~/.foundry/cache"]
+    }
+  }
+}

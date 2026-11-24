@@ -19,6 +19,9 @@ import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 contract EthContext is BaseConfig {
     using stdStorage for StdStorage;
 
+    /// @dev Pinned so fork results are reproducible; bump deliberately in a `test:` commit.
+    uint256 internal constant ETH_FORK_BLOCK = 26_438_213;
+
     // Shift core contracts
     address internal constant VAULT = 0xB6Fa60AF402cd2810a68fC6b2F6Ce66C3d7233C4;
     address internal constant SWAP_ROUTER = 0x2E275e8D4bA74566FB5DF2C5BC72D1e661d3703B;
@@ -35,6 +38,7 @@ contract EthContext is BaseConfig {
     address internal constant USDC_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
     address internal constant PYUSD_PRICE_FEED = 0x8f1dF6D7F2db73eECE86a18b4381F4707b918FB1;
     address internal constant RLUSD_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+    address internal constant USDT_PRICE_FEED = 0x3E7d1eAB13ad0104d2750B8863b489D65364e32D;
 
     address internal PYUSD_USDC_ADAPTER = 0x9059c7a9921fFF86Df6d16Cb02578BaeD5835397;
 
@@ -51,8 +55,17 @@ contract EthContext is BaseConfig {
     address internal constant MORPHO_SENTORA_RLUSD = 0x6dC58a0FdfC8D694e571DC59B9A52EEEa780E6bf;
     address internal constant MORPHO_MERKLE_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
 
+    // Compound V3 addresses
+    address internal constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+    address internal constant COMP = 0xc00e94Cb662C3520282E6f5717214004A7f26888;
+    address internal constant COMPOUND_V3_USDT = 0x3Afdc9BCA9213A35503b077a6072F3D0d5AB0840;
+    address internal constant COMPOUND_V3_USDC = 0xc3d688B66703497DAA19211EEdff47f25384cdc3;
+    address internal constant COMPOUND_MERKLE_DISTRIBUTOR = 0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae;
+
     function setUp() public virtual override {
         super.setUp();
+
+        vm.createSelectFork("ethereum", ETH_FORK_BLOCK);
 
         vm.label(USDC, "USDC");
         vm.label(PYUSD, "PYUSD");
@@ -74,18 +87,19 @@ contract EthContext is BaseConfig {
         _grantRoles();
 
         vm.prank(roles.deployer);
-        address chainlinkOracleWrapper = address(
-            new ChainlinkOracleWrapper(roles.defaultAdmin, roles.oracleManager, PRICE_ORACLE_UPDATE_INTERVAL)
-        );
+        address chainlinkOracleWrapper =
+            address(new ChainlinkOracleWrapper(roles.defaultAdmin, roles.oracleManager, PRICE_ORACLE_UPDATE_INTERVAL));
 
         vm.startPrank(roles.oracleManager);
         IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(USDC, USDC_PRICE_FEED);
         IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(PYUSD, PYUSD_PRICE_FEED);
         IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(RLUSD, RLUSD_PRICE_FEED);
+        IChainlinkOracleWrapper(chainlinkOracleWrapper).setChainlinkFeed(USDT, USDT_PRICE_FEED);
 
         IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(USDC, chainlinkOracleWrapper);
         IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(PYUSD, chainlinkOracleWrapper);
         IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(RLUSD, chainlinkOracleWrapper);
+        IPriceOracleAggregator(PRICE_ORACLE_AGGREGATOR).setPriceOracle(USDT, chainlinkOracleWrapper);
         vm.stopPrank();
     }
 
@@ -104,8 +118,8 @@ contract EthContext is BaseConfig {
             swapRouter: SWAP_ROUTER
         });
 
-        IStrategyContainer.StrategyContainerInitParams memory strategyContainerInitParams = IStrategyContainer
-            .StrategyContainerInitParams({
+        IStrategyContainer.StrategyContainerInitParams memory strategyContainerInitParams =
+            IStrategyContainer.StrategyContainerInitParams({
                 roleAddresses: IStrategyContainer.RoleAddresses({
                     strategyManager: roles.strategyManager,
                     harvestManager: roles.harvestManager,
@@ -123,9 +137,7 @@ contract EthContext is BaseConfig {
         mockStrategyContainer = _proxify(
             address(new MockStrategyContainer()),
             abi.encodeWithSelector(
-                MockStrategyContainer.initialize.selector,
-                containerInitParams,
-                strategyContainerInitParams
+                MockStrategyContainer.initialize.selector, containerInitParams, strategyContainerInitParams
             )
         );
     }

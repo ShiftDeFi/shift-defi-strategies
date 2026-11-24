@@ -19,7 +19,7 @@ contract DeployCurveGauge is DeployBase {
 
         vm.startBroadcast();
         address implementation = address(new CurveGauge());
-        address proxy = _proxifyWithSalt(
+        _proxifyWithSalt(
             implementation,
             abi.encodeWithSelector(
                 CurveGauge.initialize.selector,

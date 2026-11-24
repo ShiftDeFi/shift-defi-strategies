@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -u
+
+msg=$(sed '/^# -\{24\} >8 -\{24\}$/,$d' "$1" | grep -v '^#')
+header=$(head -n 1 <<<"$msg")
+types='feat|fix|perf|refactor|test|docs|style|chore|wip'
+
+fail() {
+    echo "commit-msg: $1" >&2
+    echo "  $header" >&2
+    exit 1
+}
+
+[[ $header =~ ^(Merge|Revert|fixup!|squash!) ]] && exit 0
+
+header_re="^($types)(\([a-z0-9._/-]+\))?!?: [^[:space:]]"
+[[ $header =~ $header_re ]] ||
+    fail "header must be '<type>(<scope>): <summary>', type one of: ${types//|/, }, scope lower-case"
+summary=${header#*: }
+((${#summary} >= 5)) || fail "summary is shorter than 5 characters"
+((${#header} <= 72)) || fail "header is ${#header} characters, limit is 72"
+[[ $header != *. ]] || fail "header ends with a period"
+[ -z "$(sed -n 2p <<<"$msg")" ] || fail "second line must be blank"
+
+# Trailers and single-token lines such as URLs cannot be wrapped.
+long=$(awk 'NR > 2 && length > 72 && / / && !/^[A-Za-z-]+: / {print NR": "$0}' <<<"$msg")
+[ -z "$long" ] || fail "body lines over 72 characters:
+$long"
+exit 0
