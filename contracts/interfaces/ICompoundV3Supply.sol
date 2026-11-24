@@ -2,31 +2,64 @@
 pragma solidity ^0.8.28;
 
 interface ICompoundV3Supply {
-    struct InternalHarvestLocalVars {
-        address depositToken;
-        address cToken;
-        uint256 cTokenDecimalsFactor;
-        uint256 dTokenDecimalsFactor;
-        uint256 cTokenIncome;
-        uint256 cTokenIncomeInAsset;
-        uint256 beforeBalance;
-        uint256 compRewardsInAsset;
-        uint256 treasuryFee;
-        uint256 missingFeeInAsset;
-        uint256 cTokensToWithdraw;
-        uint256 currentCTokenBalance;
-        uint256 incomeShare;
+    // ---- Structs ----
+
+    struct SlippageParams {
+        uint256 enterMaxSlippage;
+        uint256 exitMaxSlippage;
+        uint256 emergencyExitMaxSlippage;
     }
 
-    struct InternalEnterLocalVars {
-        uint256 balance;
-        address depositToken;
-        address cToken;
+    struct AutomaticHarvestLocalVars {
+        address cometCached;
+        address baseTokenCached;
+        uint256 rewardTokensLength;
+        uint256 balanceBeforeReinvest;
+        uint256 currentBalance;
+        uint256 cometBalanceBefore;
+        uint256 cometBalanceDelta;
+        uint256 feeToTreasury;
+        uint256 feeFromReinvest;
     }
 
-    struct InternalExitLocalVars {
-        uint256 balance;
-        uint256 liquidity;
-        address cToken;
+    struct ManualClaimLocalVars {
+        address cometCached;
+        address baseTokenCached;
+        address strategyContainerCached;
+        address treasury;
+        uint256 feePct;
+        uint256 lastBalanceCached;
+        uint256 currentBalance;
+        uint256 fee;
+        address[] users;
     }
+
+    // ---- Events ----
+
+    event RewardTokensUpdated(address[] rewardTokens);
+
+    // ---- Errors ----
+
+    error NoSupplyAllocation();
+    error WithdrawAmountTooSmall();
+    error RewardTokenMatchesBaseToken();
+    error RewardTokenMatchesComet();
+
+    // ---- Functions ----
+
+    /// @notice Returns the reward tokens swapped and reinvested by the automatic harvest.
+    /// @return The addresses of the reward tokens.
+    function getRewardTokens() external view returns (address[] memory);
+
+    /// @notice Sets the reward tokens. Only callable by the strategy container or role HARVEST_MANAGER_ROLE.
+    /// @param _rewardTokens The addresses of the reward tokens.
+    function setRewardTokens(address[] memory _rewardTokens) external;
+
+    /// @notice Manually claims Merkl rewards. Only callable by role MERKLE_CLAIMER_ROLE.
+    /// @dev Only the base token is reinvested instantly, and only while supplied to Comet; any other claimed
+    ///      reward (e.g. COMP), and any claim made while not supplied, is left for the next automatic harvest.
+    /// @param tokens The addresses of the claimed tokens.
+    /// @param amounts The cumulative claimable amounts of the tokens.
+    /// @param proofs The Merkle proofs of the claims.
+    function manualClaim(address[] calldata tokens, uint256[] calldata amounts, bytes32[][] calldata proofs) external;
 }
