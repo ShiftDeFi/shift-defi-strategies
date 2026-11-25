@@ -24,8 +24,10 @@ build-all *args:
     FOUNDRY_PROFILE=ir forge build "$@"
 
 # Run every test; each fork test pins its own block. Extra args pass through, e.g. `just test --mt test_Harvest`
+# Monad forks need `--network monad`, so they run in a second pass; forge rejects a second `--mp`.
 test *args:
-    FOUNDRY_PROFILE=ir forge test "$@"
+    FOUNDRY_PROFILE=ir forge test --nmp "test/monad/**" "$@"
+    FOUNDRY_PROFILE=ir forge test --network monad --mp "test/monad/**" "$@"
 
 # Ethereum fork suite
 test-eth *args:
@@ -37,7 +39,7 @@ test-base *args:
 
 # Monad fork suite
 test-monad *args:
-    FOUNDRY_PROFILE=ir forge test -vvv --mp "test/monad/**" "$@"
+    FOUNDRY_PROFILE=ir forge test -vvv --network monad --mp "test/monad/**" "$@"
 
 # Format sources
 fmt:
