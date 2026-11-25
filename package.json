@@ -1,6 +1,6 @@
 {
   "name": "@shift-defi/strategies",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Strategy smart contracts for Shift DeFi Platform",
   "author": "ShiftDeFi",
   "license": "MIT",
@@ -11,7 +11,10 @@
   "homepage": "https://shiftdefi.com/",
   "files": [
     "contracts/**/*.sol",
-    "!contracts/dependencies/safe"
+    "!contracts/dependencies/safe",
+    "!contracts/fluid",
+    "!contracts/interfaces/IFluidSupply.sol",
+    "!contracts/dependencies/fluid"
   ],
   "scripts": {
     "prepare": "husky",
@@ -19,7 +22,7 @@
     "claim:propose": "npm run claim -- --propose"
   },
   "dependencies": {
-    "@shift-defi/core": "^0.7.1"
+    "@shift-defi/core": "0.7.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
@@ -32,12 +35,6 @@
   "lint-staged": {
     "*.sol": [
       "prettier --write --plugin=prettier-plugin-solidity"
-    ],
-    "scripts": {
-        "claim": "set -a; [ -f tools/merkl-claim.env ] && . ./tools/merkl-claim.env; set +a; node tools/merkl-claim.mjs",
-        "claim:propose": "npm run claim -- --propose"
-    },
-    "dependencies": {
-        "@shift-defi/core": "^0.7.1"
-    }
+    ]
+  }
 }
