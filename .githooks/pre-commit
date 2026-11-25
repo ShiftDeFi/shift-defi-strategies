@@ -17,7 +17,9 @@ if ! out=$(forge build contracts --sizes 2>&1); then
 fi
 
 # Fork tests pin their blocks, so a failure here is reproducible, not RPC noise.
-if ! out=$(FOUNDRY_PROFILE=ir forge test 2>&1); then
+# Monad forks need `--network monad`, so they run in a second pass.
+if ! out=$(FOUNDRY_PROFILE=ir forge test --nmp "test/monad/**" 2>&1 &&
+    FOUNDRY_PROFILE=ir forge test --network monad --mp "test/monad/**" 2>&1); then
     { echo "pre-commit: forge test failed:"; tail -n 60 <<<"$out"; } >&2
     exit 1
 fi
