@@ -11,7 +11,10 @@
   "homepage": "https://shiftdefi.com/",
   "files": [
     "contracts/**/*.sol",
-    "!contracts/dependencies/safe"
+    "!contracts/dependencies/safe",
+    "!contracts/fluid",
+    "!contracts/interfaces/IFluidSupply.sol",
+    "!contracts/dependencies/fluid"
   ],
   "scripts": {
     "prepare": "husky",
